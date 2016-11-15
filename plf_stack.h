@@ -678,7 +678,7 @@ public:
 			--top_element;
 		}
 		else
-		{ // ie. is start element, but not first group in stack (if it were, totalsize would be 0 after decrement)
+		{ // ie. is start element, but not first group in stack (if it were, total_number_of_elements would be 0 after decrement)
 			current_group = current_group->previous_group;
 			start_element = current_group->elements;
 			end_element = top_element = current_group->end;
@@ -739,7 +739,7 @@ public:
 
 
 	
-	inline size_type size() const PLF_STACK_NOEXCEPT
+	inline PLF_STACK_FORCE_INLINE size_type size() const PLF_STACK_NOEXCEPT
 	{
 		return total_number_of_elements;
 	}
