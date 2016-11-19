@@ -237,7 +237,7 @@ public:
 	{
 		assert(min_elements_per_group > 2);
 		assert(min_elements_per_group <= group_allocator_pair.max_elements_per_group);
-		assert(group_allocator_pair.max_elements_per_group <= std::numeric_limits<size_type>::max() / 2); // Must be half of what the allocator can allocate, otherwise could result in overflow, because at the point where we might allocate a max group of that size, the previous groups may have a a total size equal to it
+		assert(group_allocator_pair.max_elements_per_group <= std::numeric_limits<size_type>::max() / 2); // Must be half of what the allocator can allocate, otherwise could result in overflow, because at the point where we might allocate a max group of that size, the previous groups may have a total size equal to it, as each group doubles the previous capacity of the stack.
 	}
 
 

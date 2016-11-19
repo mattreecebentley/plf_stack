@@ -1,7 +1,5 @@
 #include <iostream>
-#include <cstdio> // log redirection
-#include <cstdlib> // rand
-#include <ctime> // timer
+
 #include "plf_stack.h"
 
 
@@ -68,12 +66,7 @@ void title1(const char *title_text)
 	std::cout << "===========================================" << std::endl << std::endl << std::endl; 
 }
 
-void title2(const char *title_text)
-{
-	std::cout << std::endl << std::endl << "--- " << title_text << " ---" << std::endl << std::endl;
-}
 
-	
 void failpass(const char *test_type, bool condition)
 {
 	std::cout << test_type << ": ";
@@ -91,15 +84,29 @@ void failpass(const char *test_type, bool condition)
 }
 
 
+// Fast xorshift+128 random number generator function (original: https://codingforspeed.com/using-faster-psudo-random-generator-xorshift/)
+unsigned int xor_rand()
+{
+	static unsigned int x = 123456789;
+	static unsigned int y = 362436069;
+	static unsigned int z = 521288629;
+	static unsigned int w = 88675123;
+	
+	const unsigned int t = x ^ (x << 11); 
+
+	// Rotate the static values (w rotation in return statement):
+	x = y;
+	y = z;
+	z = w;
+   
+	return w = w ^ (w >> 19) ^ (t ^ (t >> 8));
+}
+
+
+
 int main()
 {
 	freopen("error.log","w", stderr);
-
-	{
-		time_t timer;
-		time(&timer);
-		srand((unsigned int)timer); // Note: using random numbers to avoid CPU prediction
-	}
 
 	using namespace std;
 	using namespace plf;
@@ -172,7 +179,7 @@ int main()
 
 			do
 			{
-				if (rand() % 5 == 0)
+				if ((xor_rand() & 3) == 0)
 				{
 					i_stack.push(10);
 				}
