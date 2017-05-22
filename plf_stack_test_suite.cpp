@@ -8,51 +8,48 @@
 
 	#if _MSC_VER < 1600
 		#define PLF_NOEXCEPT throw()
+		#define PLF_NOEXCEPT_SWAP(the_allocator) 
 	#elif _MSC_VER == 1600
 		#define PLF_MOVE_SEMANTICS_SUPPORT
 		#define PLF_NOEXCEPT throw()
+		#define PLF_NOEXCEPT_SWAP(the_allocator) 
 	#elif _MSC_VER == 1700
 		#define PLF_TYPE_TRAITS_SUPPORT
 		#define PLF_ALLOCATOR_TRAITS_SUPPORT
 		#define PLF_MOVE_SEMANTICS_SUPPORT
 		#define PLF_NOEXCEPT throw()
+		#define PLF_NOEXCEPT_SWAP(the_allocator) 
 	#elif _MSC_VER == 1800
 		#define PLF_TYPE_TRAITS_SUPPORT
 		#define PLF_ALLOCATOR_TRAITS_SUPPORT
 		#define PLF_VARIADICS_SUPPORT
 		#define PLF_MOVE_SEMANTICS_SUPPORT
 		#define PLF_NOEXCEPT throw()
-		#define PLF_INITIALIZER_LIST_SUPPORT
+		#define PLF_NOEXCEPT_SWAP(the_allocator) 
 	#elif _MSC_VER >= 1900
 		#define PLF_TYPE_TRAITS_SUPPORT
 		#define PLF_ALLOCATOR_TRAITS_SUPPORT
 		#define PLF_VARIADICS_SUPPORT
 		#define PLF_MOVE_SEMANTICS_SUPPORT
 		#define PLF_NOEXCEPT noexcept
-		#define PLF_INITIALIZER_LIST_SUPPORT
+		#define PLF_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value)
 	#endif
 #elif defined(__cplusplus) && __cplusplus >= 201103L
 	#define PLF_FORCE_INLINE // note: GCC creates faster code without forcing inline
 
-	#if defined(__GNUC__) && defined(__GNUC_MINOR__) && !defined(__clang__) // If compiler is GCC/G++
-		#if __GNUC__ == 4 && __GNUC_MINOR__ >= 4 // 4.3 and below do not support initializer lists
-			#define PLF_INITIALIZER_LIST_SUPPORT
-		#elif __GNUC__ >= 5 // GCC v4.9 and below do not support std::is_trivially_copyable
-			#define PLF_INITIALIZER_LIST_SUPPORT
-			#define PLF_TYPE_TRAITS_SUPPORT
-		#endif
-	#else // Assume type traits and initializer support for non-GCC compilers
-		#define PLF_INITIALIZER_LIST_SUPPORT
+	#if (!defined(__GNUC__) || __GNUC__ >= 5) && (defined (__GLIBCXX__) && __GLIBCXX__ >= 20150422) // GCC v4.9 and below do not support std::is_trivially_copyable, libc++ does not support type traits, not assuming type trait support for other std library versions
 		#define PLF_TYPE_TRAITS_SUPPORT
-	#endif
-
+	#endif	
+	
 	#define PLF_ALLOCATOR_TRAITS_SUPPORT
 	#define PLF_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
 	#define PLF_MOVE_SEMANTICS_SUPPORT
 	#define PLF_NOEXCEPT noexcept
+	#define PLF_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value)
 #else
 	#define PLF_FORCE_INLINE
 	#define PLF_NOEXCEPT throw()
+	#define PLF_NOEXCEPT_SWAP(the_allocator)
 #endif
 
 
@@ -117,14 +114,14 @@ unsigned int xor_rand()
 	{
 		const bool success;
 
-		perfect_forwarding_test(int &&perfect1, int& perfect2)
+		perfect_forwarding_test(int && /*perfect1*/, int& perfect2)
 			: success(true)
 		{
 			perfect2 = 1;
 		}
 
 		template <typename T, typename U>
-		perfect_forwarding_test(T&& imperfect1, U&& imperfect2)
+		perfect_forwarding_test(T&& /*imperfect1*/, U&& /*imperfect2*/)
 			: success(false)
 		{}
 	};
