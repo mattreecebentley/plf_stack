@@ -28,6 +28,7 @@
 
 #include <iostream>
 #include <cstdio> // log redirection
+#include <cstdlib>
 
 #include "plf_stack.h"
 
@@ -210,7 +211,7 @@ int main()
 				}
 			} while (!i_stack.empty());;
 
-			failpass("Randomly pop/push till empty test", i_stack.size() == 0);
+			failpass("Randomly pop/push till empty test", i_stack.empty());
 
 			#ifdef PLF_VARIADICS_SUPPORT
 				i_stack.emplace(20);
