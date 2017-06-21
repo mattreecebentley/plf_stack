@@ -8,14 +8,14 @@
 	#endif
 #elif defined(__cplusplus) && __cplusplus >= 201103L
 	#if defined(__GNUC__) && defined(__GNUC_MINOR__) && !defined(__clang__) // If compiler is GCC/G++
-		#if __GNUC__ == 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4) // 4.3 and below do not support initializer lists
+		#if __GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4) // 4.3 and below do not support initializer lists
 			#define PLF_INITIALIZER_LIST_SUPPORT
 		#endif
 	#elif defined(__GLIBCXX__) // Using another compiler type with libstdc++ - we are assuming full c++11 compliance for compiler - which may not be true
 		#if __GLIBCXX__ >= 20090421 	// libstdc++ 4.3 and below do not support initializer lists
 			#define PLF_INITIALIZER_LIST_SUPPORT
 		#endif
-	#else // Assume initializer support for non-GCC compilers and standard libraries
+	#else // Assume initializer support for non-GCC compilers and standard libraries - may not be correct
 		#define PLF_INITIALIZER_LIST_SUPPORT
 	#endif
 
@@ -28,13 +28,13 @@
 
 #include <iostream>
 #include <cstdio> // log redirection
-#include <cstdlib>
-
-#include "plf_stack.h"
+#include <cstdlib> // abort
 
 #ifdef PLF_MOVE_SEMANTICS_SUPPORT
 	#include <utility> // std::move
 #endif
+
+#include "plf_stack.h"
 
 
 
@@ -72,6 +72,7 @@ void failpass(const char *test_type, bool condition)
 }
 
 
+
 // Fast xorshift+128 random number generator function (original: https://codingforspeed.com/using-faster-psudo-random-generator-xorshift/)
 unsigned int xor_rand()
 {
@@ -91,6 +92,7 @@ unsigned int xor_rand()
 }
 
 
+
 #ifdef PLF_VARIADICS_SUPPORT
 	struct perfect_forwarding_test
 	{
@@ -108,6 +110,7 @@ unsigned int xor_rand()
 		{}
 	};
 #endif
+
 
 
 int main()
