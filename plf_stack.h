@@ -212,7 +212,7 @@ private:
 	struct ebco_pair : group_allocator_type // Packaging the group allocator with least-used member variable, for empty-base-class optimisation
 	{
 		size_type max_elements_per_group;
-		ebco_pair(const size_type max_elements) : max_elements_per_group(max_elements) {};
+		explicit ebco_pair(const size_type max_elements) : max_elements_per_group(max_elements) {};
 	}						group_allocator_pair;
 
 
@@ -397,7 +397,7 @@ public:
 			source.total_number_of_elements = 0;
 		}
 	#endif
-	
+
 
 
 	~stack()
@@ -678,7 +678,7 @@ public:
 						if (current_group->next_group == NULL)
 						{
 							current_group->next_group = PLF_STACK_ALLOCATE(group_allocator_type, group_allocator_pair, 1, current_group); 
-							
+
 							try
 							{ 
 								PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, (total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group);
@@ -723,7 +723,7 @@ public:
 							clear();
 							throw;
 						}
-			
+
 						++total_number_of_elements; 
 						return;
 					}
@@ -878,7 +878,7 @@ private:
 			swap(temp);
 		#endif
 	}
-	
+
 
 
 public:
@@ -892,7 +892,7 @@ public:
 
 		min_elements_per_group = min_allocation_amount;
 		group_allocator_pair.max_elements_per_group = max_allocation_amount;
-		trim_trailing_groups();
+		free_unused_memory();
 
 		if (first_group != NULL && (static_cast<size_type>((first_group->end + 1) - first_group->elements) < min_allocation_amount || static_cast<size_type>((current_group->end + 1) - current_group->elements) > max_allocation_amount))
 		{
@@ -981,7 +981,7 @@ public:
 
 
 	// Remove trailing stack groups (not removed in general 'pop' usage for performance reasons)
-	void trim_trailing_groups() PLF_STACK_NOEXCEPT
+	void free_unused_memory() PLF_STACK_NOEXCEPT
 	{
 		if (current_group == NULL) // ie. stack is empty
 		{
@@ -1092,7 +1092,7 @@ public:
 			source.min_elements_per_group = swap_min_elements_per_group;
 			source.group_allocator_pair.max_elements_per_group = swap_max_elements_per_group;
 		#endif
-	}	
+	}
 
 
     inline allocator_type get_allocator() const PLF_STACK_NOEXCEPT
