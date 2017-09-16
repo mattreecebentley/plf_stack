@@ -261,6 +261,89 @@ int main()
 			failpass("Perfect forwarding test 2", lvalueref == 1);
 		}
 		#endif
+
+
+		{
+			title2("append tests");
+			
+			{
+				stack<int> stack1, stack2;
+				
+				for(int number = 0; number != 20; ++number)
+				{
+					stack1.push(number);
+					stack2.push(number + 20);
+				}
+				
+				stack1.append(stack2);
+				
+				int check_number = 0;
+				
+				while(!stack1.empty())
+				{
+					check_number += stack1.top();
+					stack1.pop();
+				}
+				
+				failpass("Small append test 1", check_number == 780);
+			}
+			
+
+			{
+				stack<int> stack1, stack2;
+				
+				for(int number = 0; number != 100000; ++number)
+				{
+					stack1.push(number);
+					stack2.push(number + 100000);
+				}
+				
+				stack1.append(stack2);
+				
+				unsigned int check_number = 0;
+				
+				while(!stack1.empty())
+				{
+					check_number += stack1.top();
+					stack1.pop();
+				}
+				
+				failpass("Large append test 1", check_number == 2820030816u);
+			}
+			
+
+
+			{
+				stack<int> stack1, stack2;
+				
+				for(int number = 150; number != 250; ++number)
+				{
+					stack1.push(number);
+				}
+				
+				
+				for(int number = 0; number != 150; ++number)
+				{
+					stack2.push(number);
+				}
+				
+			
+				stack1.append(stack2);
+				
+				unsigned int check_number = 0;
+
+				while(!stack1.empty())
+				{
+					check_number += stack1.top();
+					stack1.pop();
+				}
+
+				
+				failpass("Unequal size append test 1", check_number == 31125);
+			}
+			
+		}
+
 	}
 
 	title1("Test Suite PASS - Press ENTER to Exit");
