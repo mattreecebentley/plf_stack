@@ -496,7 +496,7 @@ public:
 				case 0:
 				{
 					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-						if ((!std::is_copy_constructible<element_type>::value || std::is_nothrow_copy_constructible<element_type>::value) && (!std::is_move_constructible<element_type>::value || std::is_nothrow_move_constructible<element_type>::value) && std::is_nothrow_constructible<element_type>::value)
+						if (std::is_nothrow_constructible<element_type, arguments ...>::value)
 						{
 							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), ++top_element, std::forward<arguments>(parameters)...);
 						}	
@@ -539,7 +539,7 @@ public:
 					start_element = top_element = current_group->elements;
 	
 					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-						if ((!std::is_copy_constructible<element_type>::value || std::is_nothrow_copy_constructible<element_type>::value) && (!std::is_move_constructible<element_type>::value || std::is_nothrow_move_constructible<element_type>::value) && std::is_nothrow_constructible<element_type>::value)
+						if (std::is_nothrow_constructible<element_type, arguments ...>::value)
 						{
 							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::forward<arguments>(parameters)...);
 						}	
@@ -569,7 +569,7 @@ public:
 					initialize();
 					
 					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-						if ((!std::is_copy_constructible<element_type>::value || std::is_nothrow_copy_constructible<element_type>::value) && (!std::is_move_constructible<element_type>::value || std::is_nothrow_move_constructible<element_type>::value) && std::is_nothrow_constructible<element_type>::value)
+						if (std::is_nothrow_constructible<element_type, arguments ...>::value)
 						{
 							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::forward<arguments>(parameters)...);
 						}	
@@ -595,14 +595,14 @@ public:
 
 
 
-		inline void push(const element_type &the_element)
+		void push(const element_type &the_element)
 		{
 			emplace(the_element);
 		}	
 
 
 
-		inline void push(element_type &&the_element)
+		void push(element_type &&the_element)
 		{
 			emplace(std::move(the_element));
 		}	
@@ -1110,7 +1110,7 @@ public:
 		}
 
 		const size_type original_min_elements = min_elements_per_group;
-		min_elements_per_group = (total_number_of_elements < group_allocator_pair.max_elements_per_group) ? static_cast<unsigned short>(total_number_of_elements) : group_allocator_pair.max_elements_per_group;
+		min_elements_per_group = (total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group;
 		min_elements_per_group = (min_elements_per_group < 3) ? 3 : min_elements_per_group;
 		consolidate();
 		min_elements_per_group = original_min_elements;
