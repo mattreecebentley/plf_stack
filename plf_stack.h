@@ -1,5 +1,4 @@
-// Copyright (c) 2017, Matthew Bentley (mattreecebentley@gmail.com) www.plflib.org
-
+// Copyright (c) 2018, Matthew Bentley (mattreecebentley@gmail.com) www.plflib.org
 // This software is provided 'as-is', without any express or implied
 // warranty. In no event will the authors be held liable for any damages
 // arising from the use of this software.
@@ -28,24 +27,28 @@
 
 	#if _MSC_VER < 1600
 		#define PLF_STACK_NOEXCEPT throw()
-		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) 
+		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) throw()
 	#elif _MSC_VER == 1600
 		#define PLF_STACK_MOVE_SEMANTICS_SUPPORT
 		#define PLF_STACK_NOEXCEPT throw()
-		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) 
+		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) throw()
 	#elif _MSC_VER == 1700
 		#define PLF_STACK_TYPE_TRAITS_SUPPORT
 		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
 		#define PLF_STACK_MOVE_SEMANTICS_SUPPORT
 		#define PLF_STACK_NOEXCEPT throw()
-		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) 
+		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) throw()
 	#elif _MSC_VER == 1800
 		#define PLF_STACK_TYPE_TRAITS_SUPPORT
 		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
 		#define PLF_STACK_VARIADICS_SUPPORT
 		#define PLF_STACK_MOVE_SEMANTICS_SUPPORT
 		#define PLF_STACK_NOEXCEPT throw()
-		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) 
+		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) throw()
 	#elif _MSC_VER >= 1900
 		#define PLF_STACK_TYPE_TRAITS_SUPPORT
 		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
@@ -53,31 +56,80 @@
 		#define PLF_STACK_MOVE_SEMANTICS_SUPPORT
 		#define PLF_STACK_NOEXCEPT noexcept
 		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value)
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
 	#endif
 #elif defined(__cplusplus) && __cplusplus >= 201103L
 	#define PLF_STACK_FORCE_INLINE // note: GCC creates faster code without forcing inline
 
-	#if defined(__GNUC__)
+	#if defined(__GNUC__) && defined(__GNUC_MINOR__) && !defined(__clang__) // If compiler is GCC/G++
+		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 3) || __GNUC__ > 4 // 4.3 and below do not support initializer lists
+			#define PLF_STACK_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
+		#endif
+
+		#if (__GNUC__ == 4 && __GNUC_MINOR__ < 6) || __GNUC__ < 4
+			#define PLF_STACK_NOEXCEPT throw()
+			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
+			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+		#elif __GNUC__ < 6
+			#define PLF_STACK_NOEXCEPT noexcept
+			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept
+			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
+		#else // C++17 support
+			#define PLF_STACK_NOEXCEPT noexcept
+			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
+			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value)
+		#endif
+		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 7) || __GNUC__ > 4
+			#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
+		#endif
 		#if __GNUC__ >= 5 // GCC v4.9 and below do not support std::is_trivially_copyable
 			#define PLF_STACK_TYPE_TRAITS_SUPPORT
-		#endif		
-	#elif defined (__GLIBCXX__)
-		#if __GLIBCXX__ >= 20150422 // Older stdlibc++ does not support type traits
+		#endif
+
+	#elif defined(__GLIBCXX__) // Using another compiler type with libstdc++ - we are assuming full c++11 compliance for compiler - which may not be true
+
+		#if __GLIBCXX__ >= 20080606 	// libstdc++ 4.2 and below do not support variadic templates
+			#define PLF_STACK_VARIADICS_SUPPORT
+		#endif
+		#if __GLIBCXX__ >= 20160111
+			#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
+			#define PLF_STACK_NOEXCEPT noexcept
+			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
+			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value)
+		#elif __GLIBCXX__ >= 20120322
+			#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
+			#define PLF_STACK_NOEXCEPT noexcept
+			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept
+			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
+		#else
+			#define PLF_STACK_NOEXCEPT throw()
+			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
+			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+		#endif
+		#if __GLIBCXX__ >= 20150422 // libstdc++ v4.9 and below do not support std::is_trivially_copyable
 			#define PLF_STACK_TYPE_TRAITS_SUPPORT
 		#endif
-	#elif !defined(_LIBCPP_VERSION) // assuming type trait support for other std library types except libc++, No type trait support in libc++ to date
+	#elif defined(_LIBCPP_VERSION) // No type trait support in libc++ to date
+		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
+		#define PLF_STACK_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
+		#define PLF_STACK_NOEXCEPT noexcept
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal:value)
+		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
+	#else // Assume type traits and initializer support for non-GCC compilers and standard libraries
+		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
+		#define PLF_STACK_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
 		#define PLF_STACK_TYPE_TRAITS_SUPPORT
-	#endif	
-	
-	#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
-	#define PLF_STACK_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
+		#define PLF_STACK_NOEXCEPT noexcept
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal:value)
+		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
+	#endif
+
 	#define PLF_STACK_MOVE_SEMANTICS_SUPPORT
-	#define PLF_STACK_NOEXCEPT noexcept
-	#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value)
 #else
 	#define PLF_STACK_FORCE_INLINE
 	#define PLF_STACK_NOEXCEPT throw()
 	#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+	#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
 #endif
 
 
@@ -178,6 +230,7 @@ private:
 				end(elements + elements_per_group - 1)
 			{}
 
+
 		#else
 			// This is a hack around the fact that element_allocator_type::construct only supports copy construction in C++03 and copy elision does not occur on the vast majority of compilers in this circumstance. And to avoid running out of memory (and performance loss) from allocating the same block twice, we're allocating in this constructor and moving data in the copy constructor.
 			group(const size_type elements_per_group, group_pointer_type const previous = NULL) PLF_STACK_NOEXCEPT:
@@ -199,6 +252,7 @@ private:
 		#endif
 
 
+
 		~group() PLF_STACK_NOEXCEPT
 		{
 			// Null check not necessary (for empty group and copied group as above) as delete will ignore.
@@ -208,18 +262,19 @@ private:
 
 
 	group_pointer_type		current_group, first_group;
-	element_pointer_type	top_element, start_element, end_element;
-	size_type				total_number_of_elements, min_elements_per_group;
+	element_pointer_type		top_element, start_element, end_element;
+	size_type					total_number_of_elements, min_elements_per_group;
 	struct ebco_pair : group_allocator_type // Packaging the group allocator with least-used member variable, for empty-base-class optimisation
 	{
 		size_type max_elements_per_group;
-		explicit ebco_pair(const size_type max_elements) : max_elements_per_group(max_elements) {};
+		explicit ebco_pair(const size_type max_elements) PLF_STACK_NOEXCEPT: max_elements_per_group(max_elements) {};
 	}						group_allocator_pair;
+
 
 
 public:
 
-	stack():
+	stack() PLF_STACK_NOEXCEPT:
 		element_allocator_type(element_allocator_type()),
 		current_group(NULL),
 		first_group(NULL),
@@ -251,7 +306,26 @@ public:
 	}
 
 
-	stack(const size_type min_allocation_amount, const size_type max_allocation_amount = (std::numeric_limits<size_type>::max() / 2), const element_allocator_type &alloc = element_allocator_type()):
+
+	stack(const size_type min_allocation_amount, const size_type max_allocation_amount = (std::numeric_limits<size_type>::max() / 2))  PLF_STACK_NOEXCEPT:
+		element_allocator_type(element_allocator_type()),
+		current_group(NULL),
+		first_group(NULL),
+		top_element(NULL),
+		start_element(NULL),
+		end_element(NULL),
+		total_number_of_elements(0),
+		min_elements_per_group(min_allocation_amount),
+		group_allocator_pair(max_allocation_amount)
+	{
+		assert(min_elements_per_group > 2);
+		assert(min_elements_per_group <= group_allocator_pair.max_elements_per_group);
+		assert(group_allocator_pair.max_elements_per_group <= std::numeric_limits<size_type>::max() / 2);
+	}
+
+
+
+	stack(const size_type min_allocation_amount, const size_type max_allocation_amount, const element_allocator_type &alloc):
 		element_allocator_type(alloc),
 		current_group(NULL),
 		first_group(NULL),
@@ -268,8 +342,9 @@ public:
 	}
 
 
+
 private:
-	
+
 	void copy_from_source(const stack &source)
 	{
 		assert(&source != this);
@@ -324,7 +399,7 @@ private:
 
 			min_elements_per_group = source.min_elements_per_group;
 		}
-	}	
+	}
 
 
 public:
@@ -359,7 +434,7 @@ public:
 	{
 		copy_from_source(source);
 	}
-	
+
 
 
 	#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
@@ -401,7 +476,7 @@ public:
 
 
 
-	~stack()
+	~stack() PLF_STACK_NOEXCEPT
 	{
 		destroy_all_data();
 	}
@@ -410,7 +485,7 @@ public:
 
 private:
 
-	void destroy_all_data()
+	void destroy_all_data() PLF_STACK_NOEXCEPT
 	{
 		#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
 			if (total_number_of_elements != 0 && !(std::is_trivially_destructible<element_type>::value)) // Avoid iteration for trivially-destructible types eg. POD, structs, classes with ermpty destructor
@@ -487,6 +562,232 @@ private:
 
 public:
 
+	void push(const element_type &element)
+	{
+		switch ((top_element == NULL) + (top_element == end_element))
+		{
+			case 0:
+			{
+				#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
+					if (std::is_nothrow_copy_constructible<element_type>::value)
+					{
+						PLF_STACK_CONSTRUCT(element_allocator_type, (*this), ++top_element, element);
+					}
+					else
+				#endif
+				{
+					try
+					{
+						PLF_STACK_CONSTRUCT(element_allocator_type, (*this), ++top_element, element);
+					}
+					catch (...)
+					{
+						--top_element;
+						throw;
+					}
+				}
+
+				++total_number_of_elements;
+				return;
+			}
+			case 1:
+			{
+				if (current_group->next_group == NULL)
+				{
+					current_group->next_group = PLF_STACK_ALLOCATE(group_allocator_type, group_allocator_pair, 1, current_group);
+
+					try
+					{
+						#ifdef PLF_STACK_VARIADICS_SUPPORT
+							PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, (total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group);
+						#else
+							PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, group((total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group));
+						#endif
+					}
+					catch (...)
+					{
+						PLF_STACK_DEALLOCATE(group_allocator_type, group_allocator_pair, current_group->next_group, 1);
+						current_group->next_group = NULL;
+						throw;
+					}
+				}
+
+				current_group = current_group->next_group;
+				start_element = top_element = current_group->elements;
+
+				#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
+					if (std::is_nothrow_copy_constructible<element_type>::value)
+					{
+						PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, element);
+					}	
+					else
+				#endif
+				{
+					try
+					{
+						PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, element);
+					}
+					catch (...)
+					{
+						current_group = current_group->previous_group;
+						start_element = current_group->elements;
+						top_element = current_group->end;
+						throw;
+					}
+				}
+
+
+				end_element = current_group->end;
+				++total_number_of_elements;
+				return;
+			}
+			case 2: // ie. empty stack, must initialize
+			{
+				initialize();
+				
+				#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
+					if (std::is_nothrow_copy_constructible<element_type>::value)
+					{
+						PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, element);
+					}	
+					else
+				#endif
+				{
+					try
+					{
+						PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, element);
+					}
+					catch (...)
+					{
+						clear();
+						throw;
+					}
+				}
+
+
+				++total_number_of_elements;
+				return;
+			}
+		}
+	}
+
+
+
+	#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
+		// Note: the reason for code duplication from non-move push, as opposed to using std::forward for both, was because most compilers didn't actually create as-optimal code in that strategy. Also C++03 compatibility.
+		void push(element_type &&element)
+		{
+			switch ((top_element == NULL) + (top_element == end_element))
+			{
+				case 0:
+				{
+					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
+						if (std::is_nothrow_move_constructible<element_type>::value)
+						{
+							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), ++top_element, std::move(element));
+						}
+						else
+					#endif
+					{
+						try
+						{
+							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), ++top_element, std::move(element));
+						}
+						catch (...)
+						{
+							--top_element;
+							throw;
+						}
+					}
+
+					++total_number_of_elements;
+					return;
+				}
+				case 1:
+				{
+					if (current_group->next_group == NULL)
+					{
+						current_group->next_group = PLF_STACK_ALLOCATE(group_allocator_type, group_allocator_pair, 1, current_group);
+
+						try
+						{
+							#ifdef PLF_STACK_VARIADICS_SUPPORT
+								PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, (total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group);
+							#else
+								PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, group((total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group));
+							#endif
+						}
+						catch (...)
+						{
+							PLF_STACK_DEALLOCATE(group_allocator_type, group_allocator_pair, current_group->next_group, 1);
+							current_group->next_group = NULL;
+							throw;
+						}
+					}
+	
+					current_group = current_group->next_group;
+					start_element = top_element = current_group->elements;
+
+					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
+						if (std::is_nothrow_move_constructible<element_type>::value)
+						{
+							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(element));
+						}	
+						else
+					#endif
+					{
+						try
+						{
+							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(element));
+						}
+						catch (...)
+						{
+							current_group = current_group->previous_group;
+							start_element = current_group->elements;
+							top_element = current_group->end;
+							throw;
+						}
+					}
+	
+	
+					end_element = current_group->end;
+					++total_number_of_elements;
+					return;
+				}
+				case 2: // ie. empty stack, must initialize
+				{
+					initialize();
+					
+					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
+						if (std::is_nothrow_move_constructible<element_type>::value)
+						{
+							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(element));
+						}	
+						else
+					#endif
+					{
+						try
+						{
+							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(element));
+						}
+						catch (...)
+						{
+							clear();
+							throw;
+						}
+					}
+
+
+					++total_number_of_elements;
+					return;
+				}
+			}
+		}
+	#endif
+
+
+
+
 	#ifdef PLF_STACK_VARIADICS_SUPPORT
 		template<typename... arguments>
 		void emplace(arguments &&... parameters)
@@ -499,7 +800,7 @@ public:
 						if (std::is_nothrow_constructible<element_type, arguments ...>::value)
 						{
 							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), ++top_element, std::forward<arguments>(parameters)...);
-						}	
+						}
 						else
 					#endif
 					{
@@ -534,7 +835,7 @@ public:
 							throw;
 						}
 					}
-	
+
 					current_group = current_group->next_group;
 					start_element = top_element = current_group->elements;
 	
@@ -567,12 +868,12 @@ public:
 				case 2: // ie. empty stack, must initialize
 				{
 					initialize();
-					
+
 					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
 						if (std::is_nothrow_constructible<element_type, arguments ...>::value)
 						{
 							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::forward<arguments>(parameters)...);
-						}	
+						}
 						else
 					#endif
 					{
@@ -587,248 +888,18 @@ public:
 						}
 					}
 	
-					++total_number_of_elements; 
+					++total_number_of_elements;
 					return;
 				}
 			}
 		}
 
 
-
-		void push(const element_type &the_element)
-		{
-			emplace(the_element);
-		}	
-
-
-
-		void push(element_type &&the_element)
-		{
-			emplace(std::move(the_element));
-		}	
-
-
-
-	#else // #ifndef PLF_STACK_VARIADICS_SUPPORT
-		void push(const element_type &the_element)
-		{
-			switch ((top_element == NULL) + (top_element == end_element))
-			{
-				case 0:
-				{
-					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-						if (std::is_nothrow_copy_constructible<element_type>::value)
-						{
-							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), ++top_element, the_element);
-						}	
-						else
-					#endif
-					{
-						try
-						{
-							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), ++top_element, the_element);
-						}
-						catch (...)
-						{
-							--top_element;
-							throw;
-						}
-					}
-	
-					++total_number_of_elements;
-					return;
-				}
-				case 1:
-				{
-					if (current_group->next_group == NULL)
-					{
-						current_group->next_group = PLF_STACK_ALLOCATE(group_allocator_type, group_allocator_pair, 1, current_group);
-	
-						try
-						{
-							PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, group((total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group));
-						}
-						catch (...)
-						{
-							PLF_STACK_DEALLOCATE(group_allocator_type, group_allocator_pair, current_group->next_group, 1);
-							current_group->next_group = NULL;
-							throw;
-						}
-					}
-	
-					current_group = current_group->next_group;
-					start_element = top_element = current_group->elements;
-	
-					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-						if (std::is_nothrow_copy_constructible<element_type>::value)
-						{
-							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, the_element);
-						}	
-						else
-					#endif
-					{
-						try
-						{
-							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, the_element);
-						}
-						catch (...)
-						{
-							current_group = current_group->previous_group;
-							start_element = current_group->elements;
-							top_element = current_group->end;
-							throw;
-						}
-					}
-	
-	
-					end_element = current_group->end;
-					++total_number_of_elements;
-					return;
-				}
-				case 2: // ie. empty stack, must initialize
-				{
-					initialize();
-					
-					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-						if (std::is_nothrow_copy_constructible<element_type>::value)
-						{
-							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, the_element);
-						}	
-						else
-					#endif
-					{
-						try
-						{
-							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, the_element);
-						}
-						catch (...)
-						{
-							clear();
-							throw;
-						}
-					}
-	
-	
-					++total_number_of_elements; 
-					return;
-				}
-			}
-		}
-	
-	
-	
-		#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
-			// Note: the reason for code duplication from non-move push, as opposed to using std::forward for both, was because most compilers didn't actually create as-optimal code in that strategy. Also C++03 compatible
-			void push(element_type &&the_element)
-			{
-				switch ((top_element == NULL) + (top_element == end_element))
-				{
-					case 0:
-					{
-						#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-							if (std::is_nothrow_move_constructible<element_type>::value)
-							{
-								PLF_STACK_CONSTRUCT(element_allocator_type, (*this), ++top_element, std::move(the_element));
-							}	
-							else
-						#endif
-						{
-							try
-							{
-								PLF_STACK_CONSTRUCT(element_allocator_type, (*this), ++top_element, std::move(the_element));
-							}
-							catch (...)
-							{
-								--top_element;
-								throw;
-							}
-						}
-		
-						++total_number_of_elements;
-						return;
-					}
-					case 1:
-					{
-						if (current_group->next_group == NULL)
-						{
-							current_group->next_group = PLF_STACK_ALLOCATE(group_allocator_type, group_allocator_pair, 1, current_group);
-		
-							try
-							{
-								PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, group((total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group));
-							}
-							catch (...)
-							{
-								PLF_STACK_DEALLOCATE(group_allocator_type, group_allocator_pair, current_group->next_group, 1);
-								current_group->next_group = NULL;
-								throw;
-							}
-						}
-		
-						current_group = current_group->next_group;
-						start_element = top_element = current_group->elements;
-		
-						#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-							if (std::is_nothrow_move_constructible<element_type>::value)
-							{
-								PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(the_element));
-							}	
-							else
-						#endif
-						{
-							try
-							{
-								PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(the_element));
-							}
-							catch (...)
-							{
-								current_group = current_group->previous_group;
-								start_element = current_group->elements;
-								top_element = current_group->end;
-								throw;
-							}
-						}
-		
-		
-						end_element = current_group->end;
-						++total_number_of_elements;
-						return;
-					}
-					case 2: // ie. empty stack, must initialize
-					{
-						initialize();
-						
-						#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-							if (std::is_nothrow_move_constructible<element_type>::value)
-							{
-								PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(the_element));
-							}	
-							else
-						#endif
-						{
-							try
-							{
-								PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(the_element));
-							}
-							catch (...)
-							{
-								clear();
-								throw;
-							}
-						}
-		
-		
-						++total_number_of_elements; 
-						return;
-					}
-				}
-			}
-		#endif
 	#endif
 
 
 
-	inline PLF_STACK_FORCE_INLINE reference top() const PLF_STACK_NOEXCEPT
+	inline PLF_STACK_FORCE_INLINE reference top() const // Exception may occur if stack is empty in release mode
 	{
 		assert(!empty());
 		return *top_element;
@@ -836,7 +907,7 @@ public:
 
 
 
-	void pop() PLF_STACK_NOEXCEPT
+	void pop() // Exception will occur if stack is empty in release mode
 	{
 		assert(!empty());
 
@@ -882,7 +953,7 @@ public:
 
 	#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
 		// Move assignment
-		stack & operator = (stack &&source)
+		stack & operator = (stack &&source) PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(allocator_type)
 		{
 			assert (&source != this);
 
@@ -1010,7 +1081,7 @@ public:
 
 
 
-	void clear()
+	void clear() PLF_STACK_NOEXCEPT
 	{
 		destroy_all_data();
 		current_group = NULL;
@@ -1177,7 +1248,7 @@ public:
 			total_number_of_elements = source.total_number_of_elements;
 			min_elements_per_group = source.min_elements_per_group;
 			group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
-			
+
 			source.current_group = swap_current_group;
 			source.first_group = swap_first_group;
 			source.top_element = swap_top_element;
@@ -1226,11 +1297,11 @@ public:
 
 		total_number_of_elements += source.total_number_of_elements;
 
-		
+
 		// Fill up the last group in the destination with pointers from the source:
 		size_type elements_to_be_transferred = static_cast<size_type>(end_element - top_element++);
-		size_type available_to_be_transferred = static_cast<size_type>((source.top_element - source.start_element) + 1); 
-		
+		size_type available_to_be_transferred = static_cast<size_type>((source.top_element - source.start_element) + 1);
+
 		while (elements_to_be_transferred >= available_to_be_transferred)
 		{
 			// Use the fastest method for moving iterators, while perserving values if allocator provides non-trivial pointers - unused if/else branches will be optimised out by any decent compiler:
@@ -1310,7 +1381,7 @@ public:
 
 		current_group->next_group = source.first_group;
 		source.first_group->previous_group = current_group;
-		
+
 		current_group = source.current_group;
 		top_element = source.top_element;
 		start_element = source.start_element;
@@ -1320,7 +1391,7 @@ public:
 		if (source.min_elements_per_group < min_elements_per_group)
 		{
 			min_elements_per_group = source.min_elements_per_group;
-		}	
+		}
 		
 		if (source.group_allocator_pair.max_elements_per_group < group_allocator_pair.max_elements_per_group)
 		{

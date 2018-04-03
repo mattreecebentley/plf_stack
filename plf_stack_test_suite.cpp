@@ -8,18 +8,24 @@
 	#endif
 #elif defined(__cplusplus) && __cplusplus >= 201103L
 	#if defined(__GNUC__) && defined(__GNUC_MINOR__) && !defined(__clang__) // If compiler is GCC/G++
+		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 3) || __GNUC__ > 4 // 4.3 and below do not support initializer lists
+			#define PLF_COLONY_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
+		#endif
 		#if __GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4) // 4.3 and below do not support initializer lists
 			#define PLF_INITIALIZER_LIST_SUPPORT
 		#endif
 	#elif defined(__GLIBCXX__) // Using another compiler type with libstdc++ - we are assuming full c++11 compliance for compiler - which may not be true
+		#if __GLIBCXX__ >= 20080606 	// libstdc++ 4.2 and below do not support variadic templates
+			#define PLF_COLONY_VARIADICS_SUPPORT
+		#endif
 		#if __GLIBCXX__ >= 20090421 	// libstdc++ 4.3 and below do not support initializer lists
 			#define PLF_INITIALIZER_LIST_SUPPORT
 		#endif
-	#else // Assume initializer support for non-GCC compilers and standard libraries - may not be correct
+	#else // Assume initializer/variadics support for non-GCC compilers and standard libraries - may not be accurate
+		#define PLF_VARIADICS_SUPPORT
 		#define PLF_INITIALIZER_LIST_SUPPORT
 	#endif
 
-	#define PLF_VARIADICS_SUPPORT
 	#define PLF_MOVE_SEMANTICS_SUPPORT
 #endif
 
