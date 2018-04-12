@@ -113,14 +113,14 @@
 		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
 		#define PLF_STACK_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
 		#define PLF_STACK_NOEXCEPT noexcept
-		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal:value)
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
 		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
 	#else // Assume type traits and initializer support for non-GCC compilers and standard libraries
 		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
 		#define PLF_STACK_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
 		#define PLF_STACK_TYPE_TRAITS_SUPPORT
 		#define PLF_STACK_NOEXCEPT noexcept
-		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal:value)
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
 		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
 	#endif
 
