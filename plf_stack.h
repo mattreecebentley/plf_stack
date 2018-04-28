@@ -44,7 +44,7 @@
 	#elif _MSC_VER == 1800
 		#define PLF_STACK_TYPE_TRAITS_SUPPORT
 		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
-		#define PLF_STACK_VARIADICS_SUPPORT
+		#define PLF_STACK_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
 		#define PLF_STACK_MOVE_SEMANTICS_SUPPORT
 		#define PLF_STACK_NOEXCEPT throw()
 		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
@@ -62,10 +62,9 @@
 	#define PLF_STACK_FORCE_INLINE // note: GCC creates faster code without forcing inline
 
 	#if defined(__GNUC__) && defined(__GNUC_MINOR__) && !defined(__clang__) // If compiler is GCC/G++
-		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 3) || __GNUC__ > 4 // 4.3 and below do not support initializer lists
-			#define PLF_STACK_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
+		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 3) || __GNUC__ > 4 // 4.2 and below do not support variadic templates
+			#define PLF_STACK_VARIADICS_SUPPORT
 		#endif
-
 		#if (__GNUC__ == 4 && __GNUC_MINOR__ < 6) || __GNUC__ < 4
 			#define PLF_STACK_NOEXCEPT throw()
 			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
@@ -111,16 +110,16 @@
 		#endif
 	#elif defined(_LIBCPP_VERSION) // No type trait support in libc++ to date
 		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
-		#define PLF_STACK_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
+		#define PLF_STACK_VARIADICS_SUPPORT
 		#define PLF_STACK_NOEXCEPT noexcept
-		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal:value)
 		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
 	#else // Assume type traits and initializer support for non-GCC compilers and standard libraries
 		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
-		#define PLF_STACK_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
+		#define PLF_STACK_VARIADICS_SUPPORT
 		#define PLF_STACK_TYPE_TRAITS_SUPPORT
 		#define PLF_STACK_NOEXCEPT noexcept
-		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal:value)
 		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
 	#endif
 
@@ -215,7 +214,7 @@ private:
 		typedef typename element_allocator_type::pointer						element_pointer_type;
 	#endif
 
-	struct group : private element_allocator_type // Empty base class optimisation - inheriting allocator functions
+	struct group : private element_allocator_type
 	{
 		const element_pointer_type		elements;
 		group_pointer_type				next_group, previous_group;
@@ -264,7 +263,7 @@ private:
 	group_pointer_type		current_group, first_group;
 	element_pointer_type		top_element, start_element, end_element;
 	size_type					total_number_of_elements, min_elements_per_group;
-	struct ebco_pair : group_allocator_type // Packaging the group allocator with least-used member variable, for empty-base-class optimisation
+	struct ebco_pair : group_allocator_type // Packaging the group allocator with the least-used member variable, for empty-base-class optimization
 	{
 		size_type max_elements_per_group;
 		explicit ebco_pair(const size_type max_elements) PLF_STACK_NOEXCEPT: max_elements_per_group(max_elements) {};
@@ -338,7 +337,7 @@ public:
 	{
 		assert(min_elements_per_group > 2);
 		assert(min_elements_per_group <= group_allocator_pair.max_elements_per_group);
-		assert(group_allocator_pair.max_elements_per_group <= std::numeric_limits<size_type>::max() / 2); // Must be half of what the allocator can allocate, otherwise could result in overflow, because at the point where we might allocate a max group of that size, the previous groups may have a total size equal to it, as each group doubles the previous capacity of the stack.
+		assert(group_allocator_pair.max_elements_per_group <= std::numeric_limits<size_type>::max() / 2); // Must be half of what the allocator can allocate, otherwise could result in overflow, because at the point where we might allocate a max group of that size, the previous groups will have a total size equal to it, as each group doubles the previous capacity of the stack.
 	}
 
 
@@ -450,9 +449,7 @@ public:
 			min_elements_per_group(source.min_elements_per_group),
 			group_allocator_pair(source.group_allocator_pair.max_elements_per_group)
 		{
-			// Nullify source object's contents - only first_group and total_number_of_elements required for destructor:
-			source.first_group = NULL;
-			source.total_number_of_elements = 0;
+			source.blank();
 		}
 
 
@@ -468,9 +465,7 @@ public:
 			min_elements_per_group(source.min_elements_per_group),
 			group_allocator_pair(source.group_allocator_pair.max_elements_per_group)
 		{
-			// Nullify source object's contents - only first_group and total_number_of_elements required for destructor:
-			source.first_group = NULL;
-			source.total_number_of_elements = 0;
+			source.blank();
 		}
 	#endif
 
@@ -649,7 +644,7 @@ public:
 					if (std::is_nothrow_copy_constructible<element_type>::value)
 					{
 						PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, element);
-					}	
+					}
 					else
 				#endif
 				{
@@ -814,7 +809,7 @@ public:
 							throw;
 						}
 					}
-	
+
 					++total_number_of_elements;
 					return;
 				}
@@ -838,9 +833,9 @@ public:
 
 					current_group = current_group->next_group;
 					start_element = top_element = current_group->elements;
-	
+
 					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-						if (std::is_nothrow_constructible<element_type, arguments ...>::value)
+						if (std::is_nothrow_constructible<element_type, arguments ...>::value) // should be calculated at compile-time
 						{
 							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::forward<arguments>(parameters)...);
 						}	
@@ -907,7 +902,7 @@ public:
 
 
 
-	void pop() // Exception will occur if stack is empty in release mode
+	void pop() // Exception will occur if stack is empty
 	{
 		assert(!empty());
 
@@ -968,10 +963,7 @@ public:
 			min_elements_per_group = source.min_elements_per_group;
 			group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
 
-			// Nullify source object's contents - only first_group and total_number_of_elements required to be altered for destructor to work on it:
-			source.first_group = NULL;
-			source.total_number_of_elements = 0;
-
+			source.blank();
 			return *this;
 		}
 	#endif
@@ -1080,15 +1072,35 @@ public:
 	}
 
 
+private:
+
+	inline void blank() PLF_STACK_NOEXCEPT
+	{
+		#if defined(PLF_COLONY_TYPE_TRAITS_SUPPORT) && (defined(__GNUC__) && !defined(__clang__)) && !(defined(__haswell__) || defined(__skylake__) || defined(__silvermont__) || defined(__sandybridge__) || defined(__ivybridge__) || defined(__broadwell__))
+			// this is faster under gcc if CPU is core2 and below:
+			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value && NULL == 0) // if all pointer types are trivial, and NULL is (almost always) zero, we can just nuke it with memset
+			{
+				std::memset(this, 0, offsetof(stack, min_elements_per_group));
+			}
+			else
+		#endif
+		{
+			current_group = NULL;
+			first_group = NULL;
+			top_element = NULL;
+			start_element = NULL;
+			end_element = NULL;
+			total_number_of_elements = 0;
+		}
+	}
+
+
+public:
 
 	void clear() PLF_STACK_NOEXCEPT
 	{
 		destroy_all_data();
-		current_group = NULL;
-		top_element = NULL;
-		start_element = NULL;
-		end_element = NULL;
-		total_number_of_elements = 0;
+		blank();
 	}
 
 
@@ -1121,7 +1133,7 @@ public:
 				break;
 			}
 
-			if (this_pointer++ == this_group->end) // incrementing in the more common case where this is not true - combining the equality test and increment usually compiles into single instruction as opposed to two instructions for the usual way of doing it
+			if (this_pointer++ == this_group->end) // incrementing in the more common case where this is not true - combining the equality test and increment usually compiles into a single instruction
 			{
 				this_group = this_group->next_group;
 				this_pointer = this_group->elements;
@@ -1392,7 +1404,7 @@ public:
 		{
 			min_elements_per_group = source.min_elements_per_group;
 		}
-		
+
 		if (source.group_allocator_pair.max_elements_per_group < group_allocator_pair.max_elements_per_group)
 		{
 			group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
