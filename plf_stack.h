@@ -1076,9 +1076,9 @@ private:
 
 	inline void blank() PLF_STACK_NOEXCEPT
 	{
-		#if defined(PLF_COLONY_TYPE_TRAITS_SUPPORT) && (defined(__GNUC__) && !defined(__clang__)) && !(defined(__haswell__) || defined(__skylake__) || defined(__silvermont__) || defined(__sandybridge__) || defined(__ivybridge__) || defined(__broadwell__))
-			// this is faster under gcc if CPU is core2 and below:
-			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value && NULL == 0) // if all pointer types are trivial, and NULL is (almost always) zero, we can just nuke it with memset
+		#if defined(PLF_STACK_TYPE_TRAITS_SUPPORT) && !(defined(__GNUC__) && (defined(__haswell__) || defined(__skylake__) || defined(__silvermont__) || defined(__sandybridge__) || defined(__ivybridge__) || defined(__broadwell__)))
+			// this is faster under gcc if code 'march' is optimized for core2 and below, and faster on MSVC/clang in general:
+			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value && NULL == 0) // if all pointer types are trivial, and NULL is (almost always) zero, we can just nuke it with memset (faster)
 			{
 				std::memset(this, 0, offsetof(stack, min_elements_per_group));
 			}
