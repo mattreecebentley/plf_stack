@@ -160,7 +160,7 @@
 
 
 
-#include <cstring>	// memset, memcpy, memmove
+#include <cstring>	// memset, memcpy
 #include <cassert>	// assert
 #include <limits>  // std::numeric_limits
 #include <memory>	// std::uninitialized_copy, std::allocator
