@@ -2,11 +2,11 @@
 // This software is provided 'as-is', without any express or implied
 // warranty. In no event will the authors be held liable for any damages
 // arising from the use of this software.
-// 
+//
 // Permission is granted to anyone to use this software for any purpose,
 // including commercial applications, and to alter it and redistribute it
 // freely, subject to the following restrictions:
-// 
+//
 // 1. The origin of this software must not be misrepresented; you must not
 //    claim that you wrote the original software. If you use this software
 //    in a product, an acknowledgement in the product documentation would be
@@ -614,7 +614,7 @@ public:
 					if (std::is_nothrow_copy_constructible<element_type>::value)
 					{
 						PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, element);
-					}	
+					}
 					else
 				#endif
 				{
@@ -639,7 +639,7 @@ public:
 			case 2: // ie. empty stack, must initialize
 			{
 				initialize();
-				
+
 				#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
 					if (std::is_nothrow_copy_constructible<element_type>::value)
 					{
@@ -719,7 +719,7 @@ public:
 							throw;
 						}
 					}
-	
+
 					current_group = current_group->next_group;
 					start_element = top_element = current_group->elements;
 
@@ -727,7 +727,7 @@ public:
 						if (std::is_nothrow_move_constructible<element_type>::value)
 						{
 							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(element));
-						}	
+						}
 						else
 					#endif
 					{
@@ -743,8 +743,8 @@ public:
 							throw;
 						}
 					}
-	
-	
+
+
 					end_element = current_group->end;
 					++total_number_of_elements;
 					return;
@@ -752,12 +752,12 @@ public:
 				case 2: // ie. empty stack, must initialize
 				{
 					initialize();
-					
+
 					#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
 						if (std::is_nothrow_move_constructible<element_type>::value)
 						{
 							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(element));
-						}	
+						}
 						else
 					#endif
 					{
@@ -818,7 +818,7 @@ public:
 					if (current_group->next_group == NULL)
 					{
 						current_group->next_group = PLF_STACK_ALLOCATE(group_allocator_type, group_allocator_pair, 1, current_group);
-	
+
 						try
 						{
 							PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, (total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group);
@@ -838,7 +838,7 @@ public:
 						if (std::is_nothrow_constructible<element_type, arguments ...>::value) // should be calculated at compile-time
 						{
 							PLF_STACK_CONSTRUCT(element_allocator_type, (*this), top_element, std::forward<arguments>(parameters)...);
-						}	
+						}
 						else
 					#endif
 					{
@@ -854,8 +854,8 @@ public:
 							throw;
 						}
 					}
-	
-	
+
+
 					end_element = current_group->end;
 					++total_number_of_elements;
 					return;
@@ -882,7 +882,7 @@ public:
 							throw;
 						}
 					}
-	
+
 					++total_number_of_elements;
 					return;
 				}
@@ -976,7 +976,7 @@ public:
 	}
 
 
-	
+
 	inline PLF_STACK_FORCE_INLINE size_type size() const PLF_STACK_NOEXCEPT
 	{
 		return total_number_of_elements;
@@ -1078,9 +1078,9 @@ private:
 	{
 		#if defined(PLF_STACK_TYPE_TRAITS_SUPPORT) && !(defined(__GNUC__) && (defined(__haswell__) || defined(__skylake__) || defined(__silvermont__) || defined(__sandybridge__) || defined(__ivybridge__) || defined(__broadwell__)))
 			// this is faster under gcc if code 'march' is optimized for core2 and below, and faster on MSVC/clang in general:
-			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value && NULL == reinterpret_cast<void *>(0)) // if all pointer types are trivial, and NULL is (almost always) zero, we can just nuke it with memset (faster)
+			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value && NULL == reinterpret_cast<void *>(0)) // if all pointer types are trivial, and NULL is zero, we can just nuke it with memset (faster)
 			{
-				std::memset(this, 0, offsetof(stack, min_elements_per_group));
+				std::memset(reinterpret_cast<void *>(this), 0, offsetof(stack, min_elements_per_group));
 			}
 			else
 		#endif
@@ -1285,7 +1285,7 @@ public:
 	{
 		// Process: if there are unused memory spaces at the end of the last current back group of the chain, fill those up
 		// with elements from the source back group. Then link the destination stack's groups to the source stack's groups.
-		
+
 		if (source.total_number_of_elements == 0)
 		{
 			return;
@@ -1320,7 +1320,7 @@ public:
 			#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
 				if (std::is_trivially_copyable<element_type>::value && std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible iterators ie. all iterators, unless allocator returns non-trivial pointers
 				{
-					std::memcpy(&*top_element, &*source.start_element, available_to_be_transferred * sizeof(element_type));
+					std::memcpy(reinterpret_cast<void *>(&*top_element), reinterpret_cast<void *>(&*source.start_element), available_to_be_transferred * sizeof(element_type));
 				}
 				#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
 					else if (std::is_move_constructible<element_type>::value)
@@ -1340,7 +1340,7 @@ public:
 			}
 
 			top_element += available_to_be_transferred;
-			
+
 			if (source.current_group == source.first_group)
 			{
 				--top_element;
@@ -1355,7 +1355,7 @@ public:
 			available_to_be_transferred = static_cast<size_type>((source.top_element - source.start_element) + 1);
 		}
 
-		
+
 		if (elements_to_be_transferred != 0)
 		{
 			element_pointer_type const start = source.top_element - (elements_to_be_transferred - 1);
@@ -1363,7 +1363,7 @@ public:
 			#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
 				if (std::is_trivially_copyable<element_type>::value && std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible iterators ie. all iterators, unless allocator returns non-trivial pointers
 				{
-					std::memcpy(&*top_element, &*start, elements_to_be_transferred * sizeof(element_type));
+					std::memcpy(reinterpret_cast<void *>(&*top_element), reinterpret_cast<void *>(&*start), elements_to_be_transferred * sizeof(element_type));
 				}
 				#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
 					else if (std::is_move_constructible<element_type>::value)
@@ -1389,7 +1389,7 @@ public:
 		// Trim trailing groups on both, link source and destinations groups and remove references to source groups from source:
 		source.free_unused_memory();
         free_unused_memory();
-        
+
 
 		current_group->next_group = source.first_group;
 		source.first_group->previous_group = current_group;
@@ -1398,7 +1398,7 @@ public:
 		top_element = source.top_element;
 		start_element = source.start_element;
 		end_element = source.end_element;
-		
+
 		// Correct group sizes if necessary:
 		if (source.min_elements_per_group < min_elements_per_group)
 		{
@@ -1408,15 +1408,15 @@ public:
 		if (source.group_allocator_pair.max_elements_per_group < group_allocator_pair.max_elements_per_group)
 		{
 			group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
-		}	
-		
+		}
+
 		source.current_group = NULL;
 		source.first_group = NULL;
 		source.top_element = NULL;
 		source.start_element = NULL;
 		source.end_element = NULL;
 		source.total_number_of_elements = 0;
-	}	
+	}
 
 }; // stack
 
