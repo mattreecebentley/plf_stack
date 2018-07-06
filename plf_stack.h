@@ -1076,7 +1076,7 @@ private:
 
 	inline void blank() PLF_STACK_NOEXCEPT
 	{
-		#if defined(PLF_STACK_TYPE_TRAITS_SUPPORT) && !(defined(__GNUC__) && (defined(__haswell__) || defined(__skylake__) || defined(__silvermont__) || defined(__sandybridge__) || defined(__ivybridge__) || defined(__broadwell__)))
+		#if defined(PLF_STACK_TYPE_TRAITS_SUPPORT) && !(defined(__GNUC__) && (defined(__icelake_client__) || defined(__icelake_server__) || defined(__cannonlake__) || defined(__skylake_avx512__) || defined(__haswell__) || defined(__skylake__) || defined(__silvermont__) || defined(__sandybridge__) || defined(__ivybridge__) || defined(__broadwell__)))
 			// this is faster under gcc if code 'march' is optimized for core2 and below, and faster on MSVC/clang in general:
 			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value && NULL == reinterpret_cast<void *>(0)) // if all pointer types are trivial, and NULL is zero, we can just nuke it with memset (faster)
 			{
@@ -1241,39 +1241,6 @@ public:
 
 
 
-	void swap(stack &source) PLF_STACK_NOEXCEPT_SWAP(element_allocator_type)
-	{
-		#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
-			stack temp(std::move(source));
-			source = std::move(*this);
-			*this = std::move(temp);
-		#else
-			const group_pointer_type	swap_current_group = current_group, swap_first_group = first_group;
-			const element_pointer_type	swap_top_element = top_element, swap_start_element = start_element, swap_end_element = end_element;
-			const size_type				swap_total_number_of_elements = total_number_of_elements, swap_min_elements_per_group = min_elements_per_group, swap_max_elements_per_group = group_allocator_pair.max_elements_per_group;
-
-			current_group = source.current_group;
-			first_group = source.first_group;
-			top_element = source.top_element;
-			start_element = source.start_element;
-			end_element = source.end_element;
-			total_number_of_elements = source.total_number_of_elements;
-			min_elements_per_group = source.min_elements_per_group;
-			group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
-
-			source.current_group = swap_current_group;
-			source.first_group = swap_first_group;
-			source.top_element = swap_top_element;
-			source.start_element = swap_start_element;
-			source.end_element = swap_end_element;
-			source.total_number_of_elements = swap_total_number_of_elements;
-			source.min_elements_per_group = swap_min_elements_per_group;
-			source.group_allocator_pair.max_elements_per_group = swap_max_elements_per_group;
-		#endif
-	}
-
-
-
     inline allocator_type get_allocator() const PLF_STACK_NOEXCEPT
     {
 		return element_allocator_type();
@@ -1316,9 +1283,9 @@ public:
 
 		while (elements_to_be_transferred >= available_to_be_transferred)
 		{
-			// Use the fastest method for moving iterators, while perserving values if allocator provides non-trivial pointers - unused if/else branches will be optimised out by any decent compiler:
+			// Use the fastest method for moving elements, while preserving values if allocator provides non-trivial pointers - unused if/else branches will be optimised out by any decent compiler:
 			#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-				if (std::is_trivially_copyable<element_type>::value && std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible iterators ie. all iterators, unless allocator returns non-trivial pointers
+				if (std::is_trivially_copyable<element_type>::value && std::is_trivially_destructible<element_type>::value)
 				{
 					std::memcpy(reinterpret_cast<void *>(&*top_element), reinterpret_cast<void *>(&*source.start_element), available_to_be_transferred * sizeof(element_type));
 				}
@@ -1410,13 +1377,48 @@ public:
 			group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
 		}
 
-		source.current_group = NULL;
-		source.first_group = NULL;
-		source.top_element = NULL;
-		source.start_element = NULL;
-		source.end_element = NULL;
-		source.total_number_of_elements = 0;
+		source.blank();
 	}
+
+
+
+	void swap(stack &source) PLF_STACK_NOEXCEPT_SWAP(element_allocator_type)
+	{
+		#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
+			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial we can just copy using memcpy - much faster
+			{
+				char temp[sizeof(stack)];
+				std::memcpy(reinterpret_cast<void *>(&temp), reinterpret_cast<void *>(this), sizeof(stack));
+				std::memcpy(reinterpret_cast<void *>(this), reinterpret_cast<void *>(&source), sizeof(stack));
+				std::memcpy(reinterpret_cast<void *>(&source), reinterpret_cast<void *>(&temp), sizeof(stack));
+			}
+			else
+		#endif
+		{
+			const group_pointer_type	swap_current_group = current_group, swap_first_group = first_group;
+			const element_pointer_type	swap_top_element = top_element, swap_start_element = start_element, swap_end_element = end_element;
+			const size_type				swap_total_number_of_elements = total_number_of_elements, swap_min_elements_per_group = min_elements_per_group, swap_max_elements_per_group = group_allocator_pair.max_elements_per_group;
+
+			current_group = source.current_group;
+			first_group = source.first_group;
+			top_element = source.top_element;
+			start_element = source.start_element;
+			end_element = source.end_element;
+			total_number_of_elements = source.total_number_of_elements;
+			min_elements_per_group = source.min_elements_per_group;
+			group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
+
+			source.current_group = swap_current_group;
+			source.first_group = swap_first_group;
+			source.top_element = swap_top_element;
+			source.start_element = swap_start_element;
+			source.end_element = swap_end_element;
+			source.total_number_of_elements = swap_total_number_of_elements;
+			source.min_elements_per_group = swap_min_elements_per_group;
+			source.group_allocator_pair.max_elements_per_group = swap_max_elements_per_group;
+		}
+	}
+
 
 }; // stack
 
