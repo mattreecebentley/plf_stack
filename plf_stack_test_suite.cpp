@@ -119,7 +119,6 @@
 
 
 
-#include <iostream>
 #include <cstdio> // log redirection
 #include <cstdlib> // abort
 
@@ -134,33 +133,29 @@
 
 void title1(const char *title_text)
 {
-	std::cout << std::endl << std::endl << std::endl << "*** " << title_text << " ***" << std::endl;
-	std::cout << "===========================================" << std::endl << std::endl << std::endl; 
+	printf("\n\n\n*** %s ***\n", title_text);
+	printf("===========================================\n\n\n");
 }
-
-
 
 void title2(const char *title_text)
 {
-	std::cout << std::endl << std::endl << "--- " << title_text << " ---" << std::endl << std::endl;
+	printf("\n\n--- %s ---\n\n", title_text);
 }
-
-
 
 
 void failpass(const char *test_type, bool condition)
 {
-	std::cout << test_type << ": ";
+	printf("%s: ", test_type);
 
-	if (condition) 
+	if (condition)
 	{
-		std::cout << "Pass" << std::endl;
+		printf("Pass\n");
 	}
 	else
-	{ 
-		std::cout << "Fail" << std::endl;
-		std::cin.get(); 
-		abort(); 
+	{
+		printf("Fail\n");
+		getchar();
+		abort();
 	}
 }
 
@@ -440,7 +435,7 @@ int main()
 	}
 
 	title1("Test Suite PASS - Press ENTER to Exit");
-	cin.get();
+	getchar();
 
 	return 0;
 }

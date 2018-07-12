@@ -1385,13 +1385,21 @@ public:
 	void swap(stack &source) PLF_STACK_NOEXCEPT_SWAP(element_allocator_type)
 	{
 		#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial we can just copy using memcpy - much faster
+			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial we can just copy using memcpy - faster
 			{
 				char temp[sizeof(stack)];
 				std::memcpy(reinterpret_cast<void *>(&temp), reinterpret_cast<void *>(this), sizeof(stack));
 				std::memcpy(reinterpret_cast<void *>(this), reinterpret_cast<void *>(&source), sizeof(stack));
 				std::memcpy(reinterpret_cast<void *>(&source), reinterpret_cast<void *>(&temp), sizeof(stack));
 			}
+			#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT // If pointer types are not trivial, moving them is probably going to be more efficient than copying them below
+				else if (std::is_move_assignable<group_pointer_type>::value && std::is_move_assignable<element_pointer_type>::value && std::is_move_constructible<group_pointer_type>::value && std::is_move_constructible<element_pointer_type>::value)
+				{
+					stack temp(std::move(source));
+					source = std::move(*this);
+					*this = std::move(temp);
+				}
+			#endif
 			else
 		#endif
 		{
