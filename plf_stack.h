@@ -165,11 +165,13 @@
 #include <limits>  // std::numeric_limits
 #include <memory>	// std::uninitialized_copy, std::allocator
 
+
 #ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
 	#include <utility> // std::move
 #endif
 
 #ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
+	#include <cstddef> // offsetof, used in blank function
 	#include <type_traits> // std::is_trivially_destructible
 #endif
 
@@ -1076,11 +1078,10 @@ private:
 
 	inline void blank() PLF_STACK_NOEXCEPT
 	{
-		#if defined(PLF_STACK_TYPE_TRAITS_SUPPORT) && !(defined(__GNUC__) && (defined(__icelake_client__) || defined(__icelake_server__) || defined(__cannonlake__) || defined(__skylake_avx512__) || defined(__haswell__) || defined(__skylake__) || defined(__silvermont__) || defined(__sandybridge__) || defined(__ivybridge__) || defined(__broadwell__)))
-			// this is faster under gcc if code 'march' is optimized for core2 and below, and faster on MSVC/clang in general:
-			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value && NULL == reinterpret_cast<void *>(0)) // if all pointer types are trivial, and NULL is zero, we can just nuke it with memset (faster)
+		#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
+			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
 			{
-				std::memset(reinterpret_cast<void *>(this), 0, offsetof(stack, min_elements_per_group));
+				std::memset(static_cast<void *>(this), 0, offsetof(stack, min_elements_per_group));
 			}
 			else
 		#endif
@@ -1388,9 +1389,9 @@ public:
 			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial we can just copy using memcpy - faster
 			{
 				char temp[sizeof(stack)];
-				std::memcpy(reinterpret_cast<void *>(&temp), reinterpret_cast<void *>(this), sizeof(stack));
+				std::memcpy(&temp, reinterpret_cast<void *>(this), sizeof(stack));
 				std::memcpy(reinterpret_cast<void *>(this), reinterpret_cast<void *>(&source), sizeof(stack));
-				std::memcpy(reinterpret_cast<void *>(&source), reinterpret_cast<void *>(&temp), sizeof(stack));
+				std::memcpy(reinterpret_cast<void *>(&source), &temp, sizeof(stack));
 			}
 			#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT // If pointer types are not trivial, moving them is probably going to be more efficient than copying them below
 				else if (std::is_move_assignable<group_pointer_type>::value && std::is_move_assignable<element_pointer_type>::value && std::is_move_constructible<group_pointer_type>::value && std::is_move_constructible<element_pointer_type>::value)
