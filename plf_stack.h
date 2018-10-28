@@ -171,7 +171,7 @@
 #endif
 
 #ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-	#include <cstddef> // offsetof, used in blank function
+	#include <cstddef> // offsetof, used in blank()
 	#include <type_traits> // std::is_trivially_destructible
 #endif
 
@@ -956,14 +956,23 @@ public:
 
 			destroy_all_data();
 
-			current_group = std::move(source.current_group);
-			first_group = std::move(source.first_group);
-			top_element = std::move(source.top_element);
-			start_element = std::move(source.start_element);
-			end_element = std::move(source.end_element);
-			total_number_of_elements = source.total_number_of_elements;
-			min_elements_per_group = source.min_elements_per_group;
-			group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
+			#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
+				if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value)
+				{
+					std::memcpy(static_cast<void *>(this), &source, sizeof(stack));
+				}
+				else
+			#endif
+			{
+				current_group = std::move(source.current_group);
+				first_group = std::move(source.first_group);
+				top_element = std::move(source.top_element);
+				start_element = std::move(source.start_element);
+				end_element = std::move(source.end_element);
+				total_number_of_elements = source.total_number_of_elements;
+				min_elements_per_group = source.min_elements_per_group;
+				group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
+			}
 
 			source.blank();
 			return *this;
@@ -1288,7 +1297,7 @@ public:
 			#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
 				if (std::is_trivially_copyable<element_type>::value && std::is_trivially_destructible<element_type>::value)
 				{
-					std::memcpy(reinterpret_cast<void *>(&*top_element), reinterpret_cast<void *>(&*source.start_element), available_to_be_transferred * sizeof(element_type));
+					std::memcpy(static_cast<void *>(&*top_element), static_cast<void *>(&*source.start_element), available_to_be_transferred * sizeof(element_type));
 				}
 				#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
 					else if (std::is_move_constructible<element_type>::value)
@@ -1331,7 +1340,7 @@ public:
 			#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
 				if (std::is_trivially_copyable<element_type>::value && std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible iterators ie. all iterators, unless allocator returns non-trivial pointers
 				{
-					std::memcpy(reinterpret_cast<void *>(&*top_element), reinterpret_cast<void *>(&*start), elements_to_be_transferred * sizeof(element_type));
+					std::memcpy(static_cast<void *>(&*top_element), static_cast<void *>(&*start), elements_to_be_transferred * sizeof(element_type));
 				}
 				#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
 					else if (std::is_move_constructible<element_type>::value)
@@ -1389,9 +1398,9 @@ public:
 			if (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial we can just copy using memcpy - faster
 			{
 				char temp[sizeof(stack)];
-				std::memcpy(&temp, reinterpret_cast<void *>(this), sizeof(stack));
-				std::memcpy(reinterpret_cast<void *>(this), reinterpret_cast<void *>(&source), sizeof(stack));
-				std::memcpy(reinterpret_cast<void *>(&source), &temp, sizeof(stack));
+				std::memcpy(&temp, static_cast<void *>(this), sizeof(stack));
+				std::memcpy(static_cast<void *>(this), static_cast<void *>(&source), sizeof(stack));
+				std::memcpy(static_cast<void *>(&source), &temp, sizeof(stack));
 			}
 			#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT // If pointer types are not trivial, moving them is probably going to be more efficient than copying them below
 				else if (std::is_move_assignable<group_pointer_type>::value && std::is_move_assignable<element_pointer_type>::value && std::is_move_constructible<group_pointer_type>::value && std::is_move_constructible<element_pointer_type>::value)
