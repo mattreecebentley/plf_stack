@@ -997,7 +997,11 @@ public:
 
 	inline size_type max_size() const PLF_STACK_NOEXCEPT
 	{
-		return element_allocator_type::max_size();
+		#ifdef PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
+      	return std::allocator_traits<element_allocator_type>::max_size(*this);
+		#else
+      	return element_allocator_type::max_size();
+      #endif
 	}
 
 
