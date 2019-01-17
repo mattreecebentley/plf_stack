@@ -1,4 +1,4 @@
-// Copyright (c) 2018, Matthew Bentley (mattreecebentley@gmail.com) www.plflib.org
+// Copyright (c) 2019, Matthew Bentley (mattreecebentley@gmail.com) www.plflib.org
 // This software is provided 'as-is', without any express or implied
 // warranty. In no event will the authors be held liable for any damages
 // arising from the use of this software.
@@ -108,12 +108,18 @@
 		#if __GLIBCXX__ >= 20150422 // libstdc++ v4.9 and below do not support std::is_trivially_copyable
 			#define PLF_STACK_TYPE_TRAITS_SUPPORT
 		#endif
-	#elif defined(_LIBCPP_VERSION) // No type trait support in libc++ to date
+	#elif defined(_LIBCPP_VERSION)
 		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
 		#define PLF_STACK_VARIADICS_SUPPORT
+		#define PLF_STACK_INITIALIZER_LIST_SUPPORT
+		#define PLF_STACK_ALIGNMENT_SUPPORT
 		#define PLF_STACK_NOEXCEPT noexcept
-		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal:value)
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
 		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
+
+		#if !(defined(_LIBCPP_CXX03_LANG) || defined(_LIBCPP_HAS_NO_RVALUE_REFERENCES))
+			#define PLF_STACK_TYPE_TRAITS_SUPPORT
+		#endif
 	#else // Assume type traits and initializer support for non-GCC compilers and standard libraries
 		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
 		#define PLF_STACK_VARIADICS_SUPPORT
