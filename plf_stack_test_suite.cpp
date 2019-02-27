@@ -313,18 +313,18 @@ int main()
 		{
 			title2("Stack Special Case Tests");
 
-			stack<unsigned int> i_stack(50, 100);
+			stack<int> i_stack(50, 100);
 
-			for (unsigned int temp = 0; temp != 256; ++temp)
+			for (int temp = 0; temp != 256; ++temp)
 			{
 				i_stack.push(10);
 			}
 
-			stack<unsigned int> i_stack_copy(i_stack);
+			stack<int> i_stack_copy(i_stack);
 
 			int temp2 = 0;
 
-			for (unsigned int temp = 0; temp != 256; ++temp)
+			for (int temp = 0; temp != 256; ++temp)
 			{
 				temp2 += i_stack_copy.top();
 				i_stack_copy.pop();
@@ -378,9 +378,9 @@ int main()
 			
 
 			{
-				stack<int> stack1, stack2;
+				stack<unsigned int> stack1, stack2;
 				
-				for(int number = 0; number != 100000; ++number)
+				for(unsigned int number = 0; number != 100000; ++number)
 				{
 					stack1.push(number);
 					stack2.push(number + 100000);
@@ -418,7 +418,7 @@ int main()
 			
 				stack1.append(stack2);
 				
-				unsigned int check_number = 0;
+				int check_number = 0;
 
 				while(!stack1.empty())
 				{
