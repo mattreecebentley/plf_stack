@@ -1,4 +1,6 @@
 // Copyright (c) 2019, Matthew Bentley (mattreecebentley@gmail.com) www.plflib.org
+
+// zLib license (https://www.zlib.net/zlib_license.html):
 // This software is provided 'as-is', without any express or implied
 // warranty. In no event will the authors be held liable for any damages
 // arising from the use of this software.
@@ -281,6 +283,7 @@ private:
 
 public:
 
+	// Default constructor:
 	stack() PLF_STACK_NOEXCEPT:
 		element_allocator_type(element_allocator_type()),
 		current_group(NULL),
@@ -297,6 +300,7 @@ public:
 	}
 
 
+	// Allocator-extended constructor:
 	explicit stack(const element_allocator_type &alloc):
 		element_allocator_type(alloc),
 		current_group(NULL),
@@ -314,7 +318,8 @@ public:
 
 
 
-	stack(const size_type min_allocation_amount, const size_type max_allocation_amount = (std::numeric_limits<size_type>::max() / 2))  PLF_STACK_NOEXCEPT:
+	// Constructor with minimum & maximum group size parameters:
+	stack(const size_type min_allocation_amount, const size_type max_allocation_amount = (std::numeric_limits<size_type>::max() / 2)) PLF_STACK_NOEXCEPT:
 		element_allocator_type(element_allocator_type()),
 		current_group(NULL),
 		first_group(NULL),
@@ -332,6 +337,7 @@ public:
 
 
 
+	// Allocator-extended constructor with minimum & maximum group size parameters:
 	stack(const size_type min_allocation_amount, const size_type max_allocation_amount, const element_allocator_type &alloc):
 		element_allocator_type(alloc),
 		current_group(NULL),
@@ -412,6 +418,7 @@ private:
 public:
 
 
+	// Copy constructor:
 	stack(const stack &source):
 		element_allocator_type(source),
 		current_group(NULL),
@@ -428,6 +435,7 @@ public:
 
 
 
+	// Allocator-extended copy constructor:
 	stack(const stack &source, const allocator_type &alloc):
 		element_allocator_type(alloc),
 		current_group(NULL),
@@ -1046,13 +1054,87 @@ public:
 
 private:
 
-	inline PLF_STACK_FORCE_INLINE void consolidate() // shrink to fit
-	{
-		stack temp(*this);
+	#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
+		void move_from_source(stack &source)
+		{
+			assert(&source != this);
 
+			if (total_number_of_elements == 0)
+			{
+				return;
+			}
+	
+			group_pointer_type current_copy_group = source.first_group;
+			const group_pointer_type end_copy_group = source.current_group;
+	
+			if (total_number_of_elements <= group_allocator_pair.max_elements_per_group) // most common case
+			{
+				min_elements_per_group = total_number_of_elements;
+				initialize();
+				min_elements_per_group = source.min_elements_per_group;
+
+				// Copy groups to this stack:
+				while (current_copy_group != end_copy_group)
+				{
+					std::uninitialized_copy(std::make_move_iterator(current_copy_group->elements), std::make_move_iterator(current_copy_group->end + 1), top_element);
+					top_element += (current_copy_group->end + 1) - current_copy_group->elements;
+					current_copy_group = current_copy_group->next_group;
+				}
+
+				// Handle special case of last group:
+				std::uninitialized_copy(std::make_move_iterator(source.start_element), std::make_move_iterator(source.top_element + 1), top_element);
+				end_element = (top_element += (source.top_element - source.start_element)); // This should make top_element == the last "pushed" element, rather than the one past it
+			}
+			else // uncommon edge case, so not optimising:
+			{
+				min_elements_per_group = group_allocator_pair.max_elements_per_group;
+				total_number_of_elements = 0;
+				initialize();
+
+				while (current_copy_group != end_copy_group)
+				{
+					for (element_pointer_type element_to_copy = current_copy_group->elements; element_to_copy != current_copy_group->end + 1; ++element_to_copy)
+					{
+						push(std::move(*element_to_copy));
+					}
+
+					current_copy_group = current_copy_group->next_group;
+				}
+
+				// Handle special case of last group:
+				for (element_pointer_type element_to_copy = source.start_element; element_to_copy != source.top_element + 1; ++element_to_copy)
+				{
+					push(std::move(*element_to_copy));
+				}
+
+				min_elements_per_group = source.min_elements_per_group;
+			}
+		}
+	#endif
+
+
+
+	inline void consolidate()
+	{
 		#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
-			*this = std::move(temp); // Avoid generating 2nd temporary
+			stack temp(((min_elements_per_group > total_number_of_elements) ? min_elements_per_group : ((total_number_of_elements > group_allocator_pair.max_elements_per_group) ? group_allocator_pair.max_elements_per_group : total_number_of_elements)), group_allocator_pair.max_elements_per_group); // Make first allocated group as large total number of elements, where possible
+			temp.total_number_of_elements = total_number_of_elements;
+
+			#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
+				if (std::is_move_assignable<element_type>::value && std::is_move_constructible<element_type>::value)
+				{
+					temp.move_from_source(*this);
+				}
+				else
+			#endif
+			{
+				temp.copy_from_source(*this);
+			}
+
+			temp.min_elements_per_group = min_elements_per_group; // reset to correct value for future clear() or erasures
+			*this = std::move(temp);
 		#else
+			stack temp(*this);
 			swap(temp);
 		#endif
 	}
