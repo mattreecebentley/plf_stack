@@ -1342,8 +1342,11 @@ public:
 
 	void reserve(size_type reserve_amount)
 	{
-		assert(reserve_amount > 2);
-
+		if (reserve_amount == 0 || reserve_amount <= capacity())
+		{
+			return;
+		}
+		
 		if (reserve_amount > group_allocator_pair.max_elements_per_group)
 		{
 			reserve_amount = group_allocator_pair.max_elements_per_group;
@@ -1363,10 +1366,6 @@ public:
 			min_elements_per_group = reserve_amount;
 			initialize();
 			min_elements_per_group = original_min_elements;
-		}
-		else if (reserve_amount <= capacity())
-		{
-			return;
 		}
 		else
 		{
