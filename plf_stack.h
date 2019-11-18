@@ -1332,8 +1332,7 @@ public:
 		}
 
 		const size_type original_min_elements = min_elements_per_group;
-		min_elements_per_group = (total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group;
-		min_elements_per_group = (min_elements_per_group < 3) ? 3 : min_elements_per_group;
+		min_elements_per_group = (total_number_of_elements < min_elements_per_group) ? min_elements_per_group : ((total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group);
 		consolidate();
 		min_elements_per_group = original_min_elements;
 	}
@@ -1346,7 +1345,7 @@ public:
 		{
 			return;
 		}
-		
+
 		if (reserve_amount > group_allocator_pair.max_elements_per_group)
 		{
 			reserve_amount = group_allocator_pair.max_elements_per_group;
@@ -1360,21 +1359,20 @@ public:
 			reserve_amount = max_size();
 		}
 
+		const size_type original_min_elements = min_elements_per_group;
+		min_elements_per_group = reserve_amount;
+
 		if (first_group == NULL) // If this is a newly-created stack, no pushes yet
 		{
-			const size_type original_min_elements = min_elements_per_group;
-			min_elements_per_group = reserve_amount;
 			initialize();
-			min_elements_per_group = original_min_elements;
 		}
 		else
 		{
 			// Reallocate all data:
-			const size_type original_min_elements = min_elements_per_group;
-			min_elements_per_group = reserve_amount;
 			consolidate();
-			min_elements_per_group = original_min_elements;
 		}
+
+		min_elements_per_group = original_min_elements;
 	}
 
 
