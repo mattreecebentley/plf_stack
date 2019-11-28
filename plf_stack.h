@@ -536,37 +536,38 @@ private:
 	void destroy_all_data() PLF_STACK_NOEXCEPT
 	{
 		#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-			if ((total_number_of_elements != 0) & !(std::is_trivially_destructible<element_type>::value)) // Avoid iteration for trivially-destructible types eg. POD, structs, classes with empty destructor.
-		#else // If compiler doesn't support traits, iterate regardless - trivial destructors will not be called, hopefully compiler will optimise this loop out for POD types
-			if (total_number_of_elements != 0)
-		#endif
+			if PLF_STACK_CONSTEXPR(!std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible types eg. POD, structs, classes with empty destructor.
+		#endif // If compiler doesn't support traits, iterate regardless - trivial destructors will not be called, hopefully compiler will optimise this loop out for POD types
 		{
-			while (first_group != current_group)
+			if (total_number_of_elements != 0)
 			{
-				const element_pointer_type past_end = first_group->end + 1;
+				while (first_group != current_group)
+				{
+					const element_pointer_type past_end = first_group->end + 1;
 
-				for (element_pointer_type element_pointer = first_group->elements; element_pointer != past_end; ++element_pointer)
+					for (element_pointer_type element_pointer = first_group->elements; element_pointer != past_end; ++element_pointer)
+					{
+						PLF_STACK_DESTROY(element_allocator_type, (*this), element_pointer);
+					}
+
+					const group_pointer_type next_group = first_group->next_group;
+					PLF_STACK_DESTROY(group_allocator_type, group_allocator_pair, first_group);
+					PLF_STACK_DEALLOCATE(group_allocator_type, group_allocator_pair, first_group, 1);
+					first_group = next_group;
+				}
+
+				// Special case for current group:
+				const element_pointer_type past_end = top_element + 1;
+
+				for (element_pointer_type element_pointer = start_element; element_pointer != past_end; ++element_pointer)
 				{
 					PLF_STACK_DESTROY(element_allocator_type, (*this), element_pointer);
 				}
 
-				const group_pointer_type next_group = first_group->next_group;
-				PLF_STACK_DESTROY(group_allocator_type, group_allocator_pair, first_group);
-				PLF_STACK_DEALLOCATE(group_allocator_type, group_allocator_pair, first_group, 1);
-				first_group = next_group;
+				first_group = first_group->next_group;
+				PLF_STACK_DESTROY(group_allocator_type, group_allocator_pair, current_group);
+				PLF_STACK_DEALLOCATE(group_allocator_type, group_allocator_pair, current_group, 1);
 			}
-
-			// Special case for current group:
-			const element_pointer_type past_end = top_element + 1;
-
-			for (element_pointer_type element_pointer = start_element; element_pointer != past_end; ++element_pointer)
-			{
-				PLF_STACK_DESTROY(element_allocator_type, (*this), element_pointer);
-			}
-
-			first_group = first_group->next_group;
-			PLF_STACK_DESTROY(group_allocator_type, group_allocator_pair, current_group);
-			PLF_STACK_DEALLOCATE(group_allocator_type, group_allocator_pair, current_group, 1);
 		}
 
 		total_number_of_elements = 0;
@@ -960,7 +961,7 @@ public:
 		assert(!empty());
 
 		#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
-			if PLF_STACK_CONSTEXPR (!(std::is_trivially_destructible<element_type>::value))
+			if PLF_STACK_CONSTEXPR (!std::is_trivially_destructible<element_type>::value)
 		#endif
 		{
 			PLF_STACK_DESTROY(element_allocator_type, (*this), top_element);
