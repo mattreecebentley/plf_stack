@@ -1,40 +1,26 @@
 #if defined(_MSC_VER)
 	#define PLF_FORCE_INLINE __forceinline
 
-	#if _MSC_VER < 1600
-		#define PLF_NOEXCEPT throw()
-		#define PLF_NOEXCEPT_SWAP(the_allocator)
-		#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) throw()
-	#elif _MSC_VER == 1600
-		#define PLF_MOVE_SEMANTICS_SUPPORT
-		#define PLF_NOEXCEPT throw()
-		#define PLF_NOEXCEPT_SWAP(the_allocator)
-		#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) throw()
-	#elif _MSC_VER == 1700
-		#define PLF_TYPE_TRAITS_SUPPORT
-		#define PLF_ALLOCATOR_TRAITS_SUPPORT
-		#define PLF_MOVE_SEMANTICS_SUPPORT
-		#define PLF_NOEXCEPT throw()
-		#define PLF_NOEXCEPT_SWAP(the_allocator)
-		#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) throw()
-	#elif _MSC_VER == 1800
-		#define PLF_TYPE_TRAITS_SUPPORT
-		#define PLF_ALLOCATOR_TRAITS_SUPPORT
-		#define PLF_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
-		#define PLF_MOVE_SEMANTICS_SUPPORT
-		#define PLF_NOEXCEPT throw()
-		#define PLF_NOEXCEPT_SWAP(the_allocator)
-		#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) throw()
-		#define PLF_INITIALIZER_LIST_SUPPORT
-	#elif _MSC_VER >= 1900
+	#if _MSC_VER >= 1900
 		#define PLF_ALIGNMENT_SUPPORT
-		#define PLF_TYPE_TRAITS_SUPPORT
-		#define PLF_ALLOCATOR_TRAITS_SUPPORT
-		#define PLF_VARIADICS_SUPPORT
-		#define PLF_MOVE_SEMANTICS_SUPPORT
 		#define PLF_NOEXCEPT noexcept
 		#define PLF_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value || std::allocator_traits<the_allocator>::is_always_equal::value)
 		#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_move_assignment::value || std::allocator_traits<the_allocator>::is_always_equal::value)
+	#else
+		#define PLF_NOEXCEPT throw()
+		#define PLF_NOEXCEPT_SWAP(the_allocator)
+		#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) throw()
+	#endif
+
+	#if _MSC_VER >= 1600
+		#define PLF_MOVE_SEMANTICS_SUPPORT
+	#endif
+	#if _MSC_VER >= 1700
+		#define PLF_TYPE_TRAITS_SUPPORT
+		#define PLF_ALLOCATOR_TRAITS_SUPPORT
+	#endif
+	#if _MSC_VER >= 1800
+		#define PLF_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
 		#define PLF_INITIALIZER_LIST_SUPPORT
 	#endif
 
@@ -44,23 +30,20 @@
 	#else
 		#define PLF_CONSTEXPR
 	#endif
-
 	#if defined(_MSVC_LANG) && (_MSVC_LANG > 201703L)
 		#define PLF_CPP20_SUPPORT
 	#endif
-
 #elif defined(__cplusplus) && __cplusplus >= 201103L // C++11 support, at least
 	#define PLF_FORCE_INLINE // note: GCC creates faster code without forcing inline
+	#define PLF_MOVE_SEMANTICS_SUPPORT
 
 	#if defined(__GNUC__) && defined(__GNUC_MINOR__) && !defined(__clang__) // If compiler is GCC/G++
 		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 3) || __GNUC__ > 4 // 4.2 and below do not support variadic templates
 			#define PLF_VARIADICS_SUPPORT
 		#endif
-
 		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 4) || __GNUC__ > 4 // 4.3 and below do not support initializer lists
 			#define PLF_INITIALIZER_LIST_SUPPORT
 		#endif
-
 		#if (__GNUC__ == 4 && __GNUC_MINOR__ < 6) || __GNUC__ < 4
 			#define PLF_NOEXCEPT throw()
 			#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
@@ -74,7 +57,6 @@
 			#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_move_assignment::value || std::allocator_traits<the_allocator>::is_always_equal::value)
 			#define PLF_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value || std::allocator_traits<the_allocator>::is_always_equal::value)
 		#endif
-
 		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 7) || __GNUC__ > 4
 			#define PLF_ALLOCATOR_TRAITS_SUPPORT
 		#endif
@@ -112,57 +94,31 @@
 		#if __GLIBCXX__ >= 20150422 // libstdc++ v4.9 and below do not support std::is_trivially_copyable
 			#define PLF_TYPE_TRAITS_SUPPORT
 		#endif
-	#elif defined(_LIBCPP_VERSION)
-		#define PLF_ALLOCATOR_TRAITS_SUPPORT
-		#define PLF_VARIADICS_SUPPORT
-		#define PLF_INITIALIZER_LIST_SUPPORT
-		#define PLF_ALIGNMENT_SUPPORT
-		#define PLF_NOEXCEPT noexcept
-		#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_move_assignment::value || std::allocator_traits<the_allocator>::is_always_equal::value)
-		#define PLF_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value || std::allocator_traits<the_allocator>::is_always_equal::value)
-
-		#if !(defined(_LIBCPP_CXX03_LANG) || defined(_LIBCPP_HAS_NO_RVALUE_REFERENCES))
-			#define PLF_TYPE_TRAITS_SUPPORT
-		#endif
+	#elif (defined(_LIBCPP_CXX03_LANG) || defined(_LIBCPP_HAS_NO_RVALUE_REFERENCES) || defined(_LIBCPP_HAS_NO_VARIADICS)) // Special case for checking C++11 support with libCPP
+			#define PLF_NOEXCEPT throw()
+			#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
+			#define PLF_NOEXCEPT_SWAP(the_allocator)
 	#else // Assume type traits and initializer support for other compilers and standard libraries
-		#define PLF_ALLOCATOR_TRAITS_SUPPORT
-		#define PLF_ALIGNMENT_SUPPORT
-		#define PLF_VARIADICS_SUPPORT
-		#define PLF_INITIALIZER_LIST_SUPPORT
-		#define PLF_TYPE_TRAITS_SUPPORT
-		#define PLF_NOEXCEPT noexcept
-		#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_move_assignment::value || std::allocator_traits<the_allocator>::is_always_equal::value)
-		#define PLF_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value || std::allocator_traits<the_allocator>::is_always_equal::value)
+			#define PLF_VARIADICS_SUPPORT
+			#define PLF_TYPE_TRAITS_SUPPORT
+			#define PLF_MOVE_SEMANTICS_SUPPORT
+			#define PLF_ALLOCATOR_TRAITS_SUPPORT
+			#define PLF_ALIGNMENT_SUPPORT
+			#define PLF_INITIALIZER_LIST_SUPPORT
+			#define PLF_NOEXCEPT noexcept
+			#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
+			#define PLF_NOEXCEPT_SWAP(the_allocator) noexcept
 	#endif
 
-	#if __cplusplus >= 201703L
-		#if defined(__clang__) && ((__clang_major__ == 3 && __clang_minor__ == 9) || __clang_major__ > 3)
-			#define PLF_CONSTEXPR constexpr
-			#define PLF_CONSTEXPR_SUPPORT
-		#elif defined(__GNUC__) && __GNUC__ >= 7
-			#define PLF_CONSTEXPR constexpr
-			#define PLF_CONSTEXPR_SUPPORT
-		#elif !defined(__clang__) && !defined(__GNUC__)
-			#define PLF_CONSTEXPR constexpr // assume correct C++17 implementation for other compilers
-			#define PLF_CONSTEXPR_SUPPORT
-		#else
-			#define PLF_CONSTEXPR
-		#endif
+	#if __cplusplus >= 201703L   &&   ((defined(__clang__) && ((__clang_major__ == 3 && __clang_minor__ == 9) || __clang_major__ > 3))   ||   (defined(__GNUC__) && __GNUC__ >= 7)   ||   (!defined(__clang__) && !defined(__GNUC__))) // assume correct C++17 implementation for non-GNU/cland compilers
+		#define PLF_CONSTEXPR constexpr
+		#define PLF_CONSTEXPR_SUPPORT
 	#else
 		#define PLF_CONSTEXPR
 	#endif
-
-	#if __cplusplus > 201703L // C++20
-		#if defined(__clang__) && (__clang_major__ >= 10)
-			#define PLF_CPP20_SUPPORT
-		#elif defined(__GNUC__) && __GNUC__ >= 10
-			#define PLF_CPP20_SUPPORT
-		#elif !defined(__clang__) && !defined(__GNUC__) // assume correct C++20 implementation for other compilers
-			#define PLF_CPP20_SUPPORT
-		#endif
+	#if __cplusplus > 201703L    &&   ((defined(__clang__) && (__clang_major__ >= 10))   ||   (defined(__GNUC__) && __GNUC__ >= 10)   ||   (!defined(__clang__) && !defined(__GNUC__))) // assume correct C++20 implementation for other compilers
+		#define PLF_CPP20_SUPPORT
 	#endif
-
-	#define PLF_MOVE_SEMANTICS_SUPPORT
 #else
 	#define PLF_FORCE_INLINE
 	#define PLF_NOEXCEPT throw()
@@ -170,7 +126,6 @@
 	#define PLF_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
 	#define PLF_CONSTEXPR
 #endif
-
 
 
 
