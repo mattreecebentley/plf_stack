@@ -1545,18 +1545,20 @@ public:
 
 }; // stack
 
+} // plf namespace
 
+
+namespace std
+{
 
 template <class element_type, class element_allocator_type>
-inline void swap (stack<element_type, element_allocator_type> &a, stack<element_type, element_allocator_type> &b) PLF_STACK_NOEXCEPT_SWAP(element_allocator_type)
+inline void swap (plf::stack<element_type, element_allocator_type> &a, plf::stack<element_type, element_allocator_type> &b) PLF_STACK_NOEXCEPT_SWAP(element_allocator_type)
 {
 	a.swap(b);
 }
 
+}
 
-
-
-} // plf namespace
 
 #undef PLF_STACK_FORCE_INLINE
 
