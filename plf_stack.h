@@ -1051,7 +1051,7 @@ public:
 
 
 
-	size_type approximate_memory_use() const PLF_STACK_NOEXCEPT
+	size_type memory() const PLF_STACK_NOEXCEPT
 	{
 		size_type memory_use = sizeof(*this);
 		group_pointer_type temp_group = first_group;
