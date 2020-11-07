@@ -31,16 +31,22 @@
 		#define PLF_STACK_ALIGNMENT_SUPPORT
 		#define PLF_STACK_NOEXCEPT noexcept
 		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value || std::allocator_traits<the_allocator>::is_always_equal::value)
+		#define PLF_STACK_NOEXCEPT_SPLICE(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
 		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_move_assignment::value || std::allocator_traits<the_allocator>::is_always_equal::value)
 	#else
 		#define PLF_STACK_NOEXCEPT throw()
 		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+		#define PLF_STACK_NOEXCEPT_SPLICE(the_allocator)
 		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) throw()
 	#endif
 
 	#if _MSC_VER >= 1600
 		#define PLF_STACK_MOVE_SEMANTICS_SUPPORT
+		#define PLF_STACK_STATIC_ASSERT(check, message) static_assert(check, message)
+	#else
+		#define PLF_STACK_STATIC_ASSERT(check, message) assert(check)
 	#endif
+
 	#if _MSC_VER >= 1700
 		#define PLF_STACK_TYPE_TRAITS_SUPPORT
 		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
@@ -52,7 +58,6 @@
 
 	#if defined(_MSVC_LANG) && (_MSVC_LANG >= 201703L)
 		#define PLF_STACK_CONSTEXPR constexpr
-		#define PLF_STACK_CONSTEXPR_SUPPORT
 	#else
 		#define PLF_STACK_CONSTEXPR
 	#endif
@@ -66,6 +71,9 @@
 	#if defined(__GNUC__) && defined(__GNUC_MINOR__) && !defined(__clang__) // If compiler is GCC/G++
 		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 3) || __GNUC__ > 4 // 4.2 and below do not support variadic templates
 			#define PLF_STACK_VARIADICS_SUPPORT
+			#define PLF_STACK_STATIC_ASSERT(check, message) static_assert(check, message)
+		#else
+			#define PLF_STACK_STATIC_ASSERT(check, message) assert(check)
 		#endif
 		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 4) || __GNUC__ > 4 // 4.3 and below do not support initializer lists
 			#define PLF_STACK_INITIALIZER_LIST_SUPPORT
@@ -74,14 +82,17 @@
 			#define PLF_STACK_NOEXCEPT throw()
 			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
 			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+			#define PLF_STACK_NOEXCEPT_SPLICE(the_allocator)
 		#elif __GNUC__ < 6
 			#define PLF_STACK_NOEXCEPT noexcept
 			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept
 			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
+			#define PLF_STACK_NOEXCEPT_SPLICE(the_allocator) noexcept
 		#else // C++17 support
 			#define PLF_STACK_NOEXCEPT noexcept
 			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_move_assignment::value || std::allocator_traits<the_allocator>::is_always_equal::value)
 			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value || std::allocator_traits<the_allocator>::is_always_equal::value)
+			#define PLF_STACK_NOEXCEPT_SPLICE(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
 		#endif
 		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 7) || __GNUC__ > 4
 			#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
@@ -95,6 +106,9 @@
 	#elif defined(__GLIBCXX__) // Using another compiler type with libstdc++ - we are assuming full c++11 compliance for compiler - which may not be true
 		#if __GLIBCXX__ >= 20080606 	// libstdc++ 4.2 and below do not support variadic templates
 			#define PLF_STACK_VARIADICS_SUPPORT
+			#define PLF_STACK_STATIC_ASSERT(check, message) static_assert(check, message)
+		#else
+			#define PLF_STACK_STATIC_ASSERT(check, message) assert(check)
 		#endif
 		#if __GLIBCXX__ >= 20090421 	// libstdc++ 4.3 and below do not support initializer lists
 			#define PLF_STACK_INITIALIZER_LIST_SUPPORT
@@ -104,15 +118,18 @@
 			#define PLF_STACK_NOEXCEPT noexcept
 			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_move_assignment::value || std::allocator_traits<the_allocator>::is_always_equal::value)
 			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value || std::allocator_traits<the_allocator>::is_always_equal::value)
+			#define PLF_STACK_NOEXCEPT_SPLICE(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
 		#elif __GLIBCXX__ >= 20120322
 			#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
 			#define PLF_STACK_NOEXCEPT noexcept
 			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept
 			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
+			#define PLF_STACK_NOEXCEPT_SPLICE(the_allocator) noexcept
 		#else
 			#define PLF_STACK_NOEXCEPT throw()
 			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
 			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+			#define PLF_STACK_NOEXCEPT_SPLICE(the_allocator)
 		#endif
 		#if __GLIBCXX__ >= 20130322
 			#define PLF_STACK_ALIGNMENT_SUPPORT
@@ -121,59 +138,67 @@
 			#define PLF_STACK_TYPE_TRAITS_SUPPORT
 		#endif
 	#elif (defined(_LIBCPP_CXX03_LANG) || defined(_LIBCPP_HAS_NO_RVALUE_REFERENCES) || defined(_LIBCPP_HAS_NO_VARIADICS)) // Special case for checking C++11 support with libCPP
-			#define PLF_STACK_NOEXCEPT throw()
-			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
-			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+		#define PLF_STACK_STATIC_ASSERT(check, message) assert(check)
+		#define PLF_STACK_NOEXCEPT throw()
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
+		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+		#define PLF_STACK_NOEXCEPT_SPLICE(the_allocator)
 	#else // Assume type traits and initializer support for other compilers and standard libraries
-			#define PLF_STACK_VARIADICS_SUPPORT
-			#define PLF_STACK_TYPE_TRAITS_SUPPORT
-			#define PLF_STACK_MOVE_SEMANTICS_SUPPORT
-			#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
-			#define PLF_STACK_ALIGNMENT_SUPPORT
-			#define PLF_STACK_INITIALIZER_LIST_SUPPORT
-			#define PLF_STACK_NOEXCEPT noexcept
-			#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
-			#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
+		#define PLF_STACK_STATIC_ASSERT(check, message) static_assert(check, message)
+		#define PLF_STACK_VARIADICS_SUPPORT
+		#define PLF_STACK_TYPE_TRAITS_SUPPORT
+		#define PLF_STACK_MOVE_SEMANTICS_SUPPORT
+		#define PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
+		#define PLF_STACK_ALIGNMENT_SUPPORT
+		#define PLF_STACK_INITIALIZER_LIST_SUPPORT
+		#define PLF_STACK_NOEXCEPT noexcept
+		#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator) noexcept
+		#define PLF_STACK_NOEXCEPT_SWAP(the_allocator) noexcept
+		#define PLF_STACK_NOEXCEPT_SPLICE(the_allocator) noexcept
 	#endif
 
-	#if __cplusplus >= 201703L   &&   ((defined(__clang__) && ((__clang_major__ == 3 && __clang_minor__ == 9) || __clang_major__ > 3))   ||   (defined(__GNUC__) && __GNUC__ >= 7)   ||   (!defined(__clang__) && !defined(__GNUC__))) // assume correct C++17 implementation for non-GNU/cland compilers
+	#if __cplusplus >= 201703L && ((defined(__clang__) && ((__clang_major__ == 3 && __clang_minor__ == 9) || __clang_major__ > 3))	 ||	(defined(__GNUC__) && __GNUC__ >= 7)	||   (!defined(__clang__) && !defined(__GNUC__))) // assume correct C++17 implementation for non-GNU/cland compilers
 		#define PLF_STACK_CONSTEXPR constexpr
-		#define PLF_STACK_CONSTEXPR_SUPPORT
 	#else
 		#define PLF_STACK_CONSTEXPR
 	#endif
-	#if __cplusplus > 201703L    &&   ((defined(__clang__) && (__clang_major__ >= 10))   ||   (defined(__GNUC__) && __GNUC__ >= 10)   ||   (!defined(__clang__) && !defined(__GNUC__))) // assume correct C++20 implementation for other compilers
+	#if __cplusplus > 201703L && ((defined(__clang__) && (__clang_major__ >= 10)) || (defined(__GNUC__) && __GNUC__ >= 10) || (!defined(__clang__) && !defined(__GNUC__))) // assume correct C++20 implementation for other compilers
 		#define PLF_STACK_CPP20_SUPPORT
 	#endif
 #else
+	#define PLF_STACK_STATIC_ASSERT(check, message) assert(check)
 	#define PLF_STACK_FORCE_INLINE
 	#define PLF_STACK_NOEXCEPT throw()
 	#define PLF_STACK_NOEXCEPT_SWAP(the_allocator)
+	#define PLF_STACK_NOEXCEPT_SPLICE(the_allocator)
 	#define PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT(the_allocator)
 	#define PLF_STACK_CONSTEXPR
 #endif
 
 
+
+
+
 #ifdef PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
 	#ifdef PLF_STACK_VARIADICS_SUPPORT
-		#define PLF_STACK_CONSTRUCT(the_allocator, allocator_instance, location, ...) std::allocator_traits<the_allocator>::construct(allocator_instance, location, __VA_ARGS__)
+		#define PLF_STACK_CONSTRUCT(the_allocator, allocator_instance, location, ...)	std::allocator_traits<the_allocator>::construct(allocator_instance, location, __VA_ARGS__)
 	#else
 		#define PLF_STACK_CONSTRUCT(the_allocator, allocator_instance, location, data) std::allocator_traits<the_allocator>::construct(allocator_instance, location, data)
 	#endif
 
-	#define PLF_STACK_DESTROY(the_allocator, allocator_instance, location) 			std::allocator_traits<the_allocator>::destroy(allocator_instance, location)
-	#define PLF_STACK_ALLOCATE(the_allocator, allocator_instance, size, hint) 		std::allocator_traits<the_allocator>::allocate(allocator_instance, size, hint)
- 	#define PLF_STACK_ALLOCATE_INITIALIZATION(the_allocator, size, hint) 			std::allocator_traits<the_allocator>::allocate(*this, size, hint)
-	#define PLF_STACK_DEALLOCATE(the_allocator, allocator_instance, location, size) std::allocator_traits<the_allocator>::deallocate(allocator_instance, location, size)
+	#define PLF_STACK_DESTROY(the_allocator, allocator_instance, location) 				std::allocator_traits<the_allocator>::destroy(allocator_instance, location)
+	#define PLF_STACK_ALLOCATE(the_allocator, allocator_instance, size, hint) 			std::allocator_traits<the_allocator>::allocate(allocator_instance, size, hint)
+ 	#define PLF_STACK_ALLOCATE_INITIALIZATION(the_allocator, size, hint) 				std::allocator_traits<the_allocator>::allocate(*this, size, hint)
+	#define PLF_STACK_DEALLOCATE(the_allocator, allocator_instance, location, size) 	std::allocator_traits<the_allocator>::deallocate(allocator_instance, location, size)
 #else
 	#ifdef PLF_STACK_VARIADICS_SUPPORT
-		#define PLF_STACK_CONSTRUCT(the_allocator, allocator_instance, location, ...) 	allocator_instance.construct(location, __VA_ARGS__)
+		#define PLF_STACK_CONSTRUCT(the_allocator, allocator_instance, location, ...)	allocator_instance.construct(location, __VA_ARGS__)
 	#else
-		#define PLF_STACK_CONSTRUCT(the_allocator, allocator_instance, location, data) 	allocator_instance.construct(location, data)
+		#define PLF_STACK_CONSTRUCT(the_allocator, allocator_instance, location, data) allocator_instance.construct(location, data)
 	#endif
 
-	#define PLF_STACK_DESTROY(the_allocator, allocator_instance, location) 				allocator_instance.destroy(location)
-	#define PLF_STACK_ALLOCATE(the_allocator, allocator_instance, size, hint) 			allocator_instance.allocate(size, hint)
+	#define PLF_STACK_DESTROY(the_allocator, allocator_instance, location) 			allocator_instance.destroy(location)
+	#define PLF_STACK_ALLOCATE(the_allocator, allocator_instance, size, hint)	 		allocator_instance.allocate(size, hint)
 	#define PLF_STACK_ALLOCATE_INITIALIZATION(the_allocator, size, hint) 				the_allocator::allocate(size, hint)
 	#define PLF_STACK_DEALLOCATE(the_allocator, allocator_instance, location, size) 	allocator_instance.deallocate(location, size)
 #endif
@@ -202,7 +227,6 @@
 
 namespace plf
 {
-
 
 template <class element_type, class element_allocator_type = std::allocator<element_type> > class stack : private element_allocator_type  // Empty base class optimisation - inheriting allocator functions
 {
@@ -286,11 +310,11 @@ private:
 
 	group_pointer_type		current_group, first_group;
 	element_pointer_type		top_element, start_element, end_element;
-	size_type					total_number_of_elements, min_elements_per_group;
+	size_type					total_number_of_elements, min_block_capacity;
 	struct ebco_pair : group_allocator_type // Packaging the group allocator with the least-used member variable, for empty-base-class optimization
 	{
-		size_type max_elements_per_group;
-		explicit ebco_pair(const size_type max_elements) PLF_STACK_NOEXCEPT: max_elements_per_group(max_elements) {};
+		size_type max_block_capacity;
+		explicit ebco_pair(const size_type max_elements) PLF_STACK_NOEXCEPT: max_block_capacity(max_elements) {};
 	}						group_allocator_pair;
 
 
@@ -306,12 +330,9 @@ public:
 		start_element(NULL),
 		end_element(NULL),
 		total_number_of_elements(0),
-		min_elements_per_group((sizeof(element_type) * 8 > (sizeof(*this) + sizeof(group)) * 2) ? 8 : (((sizeof(*this) + sizeof(group)) * 2) / sizeof(element_type)) + 1),
+		min_block_capacity((sizeof(element_type) * 8 > (sizeof(*this) + sizeof(group)) * 2) ? 8 : (((sizeof(*this) + sizeof(group)) * 2) / sizeof(element_type)) + 1),
 		group_allocator_pair(std::numeric_limits<size_type>::max() / 2)
-	{
-		assert(min_elements_per_group > 2);
-		assert(min_elements_per_group <= group_allocator_pair.max_elements_per_group);
-	}
+	{}
 
 
 	// Allocator-extended constructor:
@@ -323,17 +344,23 @@ public:
 		start_element(NULL),
 		end_element(NULL),
 		total_number_of_elements(0),
-		min_elements_per_group((sizeof(element_type) * 8 > (sizeof(*this) + sizeof(group)) * 2) ? 8 : (((sizeof(*this) + sizeof(group)) * 2) / sizeof(element_type)) + 1),
+		min_block_capacity((sizeof(element_type) * 8 > (sizeof(*this) + sizeof(group)) * 2) ? 8 : (((sizeof(*this) + sizeof(group)) * 2) / sizeof(element_type)) + 1),
 		group_allocator_pair(std::numeric_limits<size_type>::max() / 2)
+	{}
+
+
+
+	inline void check_capacities_conformance(const size_type min, const size_type max) const
 	{
-		assert(min_elements_per_group > 2);
-		assert(min_elements_per_group <= group_allocator_pair.max_elements_per_group);
+  		if (min < 2 || min > max || max > std::numeric_limits<size_type>::max())
+		{
+			throw std::length_error("Supplied memory block capacities outside of allowable ranges");
+		}
 	}
 
 
-
 	// Constructor with minimum & maximum group size parameters:
-	stack(const size_type min_allocation_amount, const size_type max_allocation_amount = (std::numeric_limits<size_type>::max() / 2)) PLF_STACK_NOEXCEPT:
+	stack(const size_type min, const size_type max = (std::numeric_limits<size_type>::max() / 2)) PLF_STACK_NOEXCEPT:
 		element_allocator_type(element_allocator_type()),
 		current_group(NULL),
 		first_group(NULL),
@@ -341,18 +368,16 @@ public:
 		start_element(NULL),
 		end_element(NULL),
 		total_number_of_elements(0),
-		min_elements_per_group(min_allocation_amount),
-		group_allocator_pair(max_allocation_amount)
+		min_block_capacity(min),
+		group_allocator_pair(max)
 	{
-		assert(min_elements_per_group > 2);
-		assert(min_elements_per_group <= group_allocator_pair.max_elements_per_group);
-		assert(group_allocator_pair.max_elements_per_group <= std::numeric_limits<size_type>::max() / 2);
+		check_capacities_conformance(min, max);
 	}
 
 
 
 	// Allocator-extended constructor with minimum & maximum group size parameters:
-	stack(const size_type min_allocation_amount, const size_type max_allocation_amount, const element_allocator_type &alloc):
+	stack(const size_type min, const size_type max, const element_allocator_type &alloc):
 		element_allocator_type(alloc),
 		current_group(NULL),
 		first_group(NULL),
@@ -360,12 +385,10 @@ public:
 		start_element(NULL),
 		end_element(NULL),
 		total_number_of_elements(0),
-		min_elements_per_group(min_allocation_amount),
-		group_allocator_pair(max_allocation_amount)
+		min_block_capacity(min),
+		group_allocator_pair(max)
 	{
-		assert(min_elements_per_group > 2);
-		assert(min_elements_per_group <= group_allocator_pair.max_elements_per_group);
-		assert(group_allocator_pair.max_elements_per_group <= std::numeric_limits<size_type>::max() / 2); // Must be half of what the allocator can allocate, otherwise could result in overflow, because at the point where we might allocate a max group of that size, the previous groups will have a total size equal to it, as each group doubles the previous capacity of the stack.
+		check_capacities_conformance(min, max);
 	}
 
 
@@ -384,11 +407,11 @@ private:
 		group_pointer_type current_copy_group = source.first_group;
 		const group_pointer_type end_copy_group = source.current_group;
 
-		if (total_number_of_elements <= group_allocator_pair.max_elements_per_group) // most common case
+		if (total_number_of_elements <= group_allocator_pair.max_block_capacity) // most common case
 		{
-			min_elements_per_group = total_number_of_elements;
+			min_block_capacity = total_number_of_elements;
 			initialize();
-			min_elements_per_group = source.min_elements_per_group;
+			min_block_capacity = source.min_block_capacity;
 
 			// Copy groups to this stack:
 			while (current_copy_group != end_copy_group)
@@ -404,7 +427,7 @@ private:
 		}
 		else // uncommon edge case, so not optimising:
 		{
-			min_elements_per_group = group_allocator_pair.max_elements_per_group;
+			min_block_capacity = group_allocator_pair.max_block_capacity;
 			total_number_of_elements = 0;
 			initialize();
 
@@ -424,7 +447,7 @@ private:
 				push(*element_to_copy);
 			}
 
-			min_elements_per_group = source.min_elements_per_group;
+			min_block_capacity = source.min_block_capacity;
 		}
 	}
 
@@ -441,8 +464,8 @@ public:
 		start_element(NULL),
 		end_element(NULL),
 		total_number_of_elements(source.total_number_of_elements),
-		min_elements_per_group(source.min_elements_per_group),
-		group_allocator_pair(source.group_allocator_pair.max_elements_per_group)
+		min_block_capacity(source.min_block_capacity),
+		group_allocator_pair(source.group_allocator_pair.max_block_capacity)
 	{
 		copy_from_source(source);
 	}
@@ -458,8 +481,8 @@ public:
 		start_element(NULL),
 		end_element(NULL),
 		total_number_of_elements(source.total_number_of_elements),
-		min_elements_per_group(source.min_elements_per_group),
-		group_allocator_pair(source.group_allocator_pair.max_elements_per_group)
+		min_block_capacity(source.min_block_capacity),
+		group_allocator_pair(source.group_allocator_pair.max_block_capacity)
 	{
 		copy_from_source(source);
 	}
@@ -476,8 +499,8 @@ public:
 			start_element(std::move(source.start_element)),
 			end_element(std::move(source.end_element)),
 			total_number_of_elements(source.total_number_of_elements),
-			min_elements_per_group(source.min_elements_per_group),
-			group_allocator_pair(source.group_allocator_pair.max_elements_per_group)
+			min_block_capacity(source.min_block_capacity),
+			group_allocator_pair(source.group_allocator_pair.max_block_capacity)
 		{
 			source.blank();
 		}
@@ -492,8 +515,8 @@ public:
 			start_element(std::move(source.start_element)),
 			end_element(std::move(source.end_element)),
 			total_number_of_elements(source.total_number_of_elements),
-			min_elements_per_group(source.min_elements_per_group),
-			group_allocator_pair(source.group_allocator_pair.max_elements_per_group)
+			min_block_capacity(source.min_block_capacity),
+			group_allocator_pair(source.group_allocator_pair.max_block_capacity)
 		{
 			source.blank();
 		}
@@ -568,9 +591,9 @@ private:
 		try
 		{
 			#ifdef PLF_STACK_VARIADICS_SUPPORT
-				PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, first_group, min_elements_per_group);
+				PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, first_group, min_block_capacity);
 			#else
-				PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, first_group, group(min_elements_per_group));
+				PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, first_group, group(min_block_capacity));
 			#endif
 		}
 		catch (...)
@@ -625,9 +648,9 @@ public:
 					try
 					{
 						#ifdef PLF_STACK_VARIADICS_SUPPORT
-							PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, (total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group);
+							PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, (total_number_of_elements < group_allocator_pair.max_block_capacity) ? total_number_of_elements : group_allocator_pair.max_block_capacity, current_group);
 						#else
-							PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, group((total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group));
+							PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, group((total_number_of_elements < group_allocator_pair.max_block_capacity) ? total_number_of_elements : group_allocator_pair.max_block_capacity, current_group));
 						#endif
 					}
 					catch (...)
@@ -738,9 +761,9 @@ public:
 						try
 						{
 							#ifdef PLF_STACK_VARIADICS_SUPPORT
-								PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, (total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group);
+								PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, (total_number_of_elements < group_allocator_pair.max_block_capacity) ? total_number_of_elements : group_allocator_pair.max_block_capacity, current_group);
 							#else
-								PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, group((total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group));
+								PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, group((total_number_of_elements < group_allocator_pair.max_block_capacity) ? total_number_of_elements : group_allocator_pair.max_block_capacity, current_group));
 							#endif
 						}
 						catch (...)
@@ -852,7 +875,7 @@ public:
 
 						try
 						{
-							PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, (total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group, current_group);
+							PLF_STACK_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, (total_number_of_elements < group_allocator_pair.max_block_capacity) ? total_number_of_elements : group_allocator_pair.max_block_capacity, current_group);
 						}
 						catch (...)
 						{
@@ -927,7 +950,7 @@ public:
 
 	inline PLF_STACK_FORCE_INLINE reference top() const // Exception may occur if stack is empty in release mode
 	{
-		assert(!empty());
+		assert(total_number_of_elements != 0);
 		return *top_element;
 	}
 
@@ -935,7 +958,7 @@ public:
 
 	void pop() // Exception will occur if stack is empty
 	{
-		assert(!empty());
+		assert(total_number_of_elements != 0);
 
 		#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
 			if PLF_STACK_CONSTEXPR (!std::is_trivially_destructible<element_type>::value)
@@ -999,8 +1022,8 @@ public:
 				start_element = std::move(source.start_element);
 				end_element = std::move(source.end_element);
 				total_number_of_elements = source.total_number_of_elements;
-				min_elements_per_group = source.min_elements_per_group;
-				group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
+				min_block_capacity = source.min_block_capacity;
+				group_allocator_pair.max_block_capacity = source.group_allocator_pair.max_block_capacity;
 			}
 
 			source.blank();
@@ -1010,6 +1033,9 @@ public:
 
 
 
+	#ifdef PLF_STACK_CPP20_SUPPORT
+		[[nodiscard]]
+	#endif
 	inline PLF_STACK_FORCE_INLINE bool empty() const PLF_STACK_NOEXCEPT
 	{
 		return total_number_of_elements == 0;
@@ -1078,15 +1104,15 @@ private:
 			{
 				return;
 			}
-	
+
 			group_pointer_type current_copy_group = source.first_group;
 			const group_pointer_type end_copy_group = source.current_group;
-	
-			if (total_number_of_elements <= group_allocator_pair.max_elements_per_group) // most common case
+
+			if (total_number_of_elements <= group_allocator_pair.max_block_capacity) // most common case
 			{
-				min_elements_per_group = total_number_of_elements;
+				min_block_capacity = total_number_of_elements;
 				initialize();
-				min_elements_per_group = source.min_elements_per_group;
+				min_block_capacity = source.min_block_capacity;
 
 				// Copy groups to this stack:
 				while (current_copy_group != end_copy_group)
@@ -1102,7 +1128,7 @@ private:
 			}
 			else // uncommon edge case, so not optimising:
 			{
-				min_elements_per_group = group_allocator_pair.max_elements_per_group;
+				min_block_capacity = group_allocator_pair.max_block_capacity;
 				total_number_of_elements = 0;
 				initialize();
 
@@ -1122,7 +1148,7 @@ private:
 					push(std::move(*element_to_copy));
 				}
 
-				min_elements_per_group = source.min_elements_per_group;
+				min_block_capacity = source.min_block_capacity;
 			}
 		}
 	#endif
@@ -1132,7 +1158,7 @@ private:
 	inline void consolidate()
 	{
 		#ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
-			stack temp(((min_elements_per_group > total_number_of_elements) ? min_elements_per_group : ((total_number_of_elements > group_allocator_pair.max_elements_per_group) ? group_allocator_pair.max_elements_per_group : total_number_of_elements)), group_allocator_pair.max_elements_per_group); // Make first allocated group as large total number of elements, where possible
+			stack temp(((min_block_capacity > total_number_of_elements) ? min_block_capacity : ((total_number_of_elements > group_allocator_pair.max_block_capacity) ? group_allocator_pair.max_block_capacity : total_number_of_elements)), group_allocator_pair.max_block_capacity); // Make first allocated group as large total number of elements, where possible
 			temp.total_number_of_elements = total_number_of_elements;
 
 			#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
@@ -1146,7 +1172,7 @@ private:
 				temp.copy_from_source(*this);
 			}
 
-			temp.min_elements_per_group = min_elements_per_group; // reset to correct value for future clear() or erasures
+			temp.min_block_capacity = min_block_capacity; // reset to correct value for future clear() or erasures
 			*this = std::move(temp);
 		#else
 			stack temp(*this);
@@ -1159,34 +1185,33 @@ private:
 public:
 
 
-	void set_block_capacity_limits(const size_type min_allocation_amount, const size_type max_allocation_amount)
+	void reshape(const size_type min, const size_type max)
 	{
-		assert(min_allocation_amount > 2);
-		assert(min_allocation_amount <= max_allocation_amount);
-		assert(max_allocation_amount <= std::numeric_limits<size_type>::max() / 2);
+		check_capacities_conformance(min, max);
 
-		min_elements_per_group = min_allocation_amount;
-		group_allocator_pair.max_elements_per_group = max_allocation_amount;
-		free_unused_memory();
+		min_block_capacity = min;
+		group_allocator_pair.max_block_capacity = max;
+		trim();
 
-		if (first_group != NULL && (static_cast<size_type>((first_group->end + 1) - first_group->elements) < min_allocation_amount || static_cast<size_type>((current_group->end + 1) - current_group->elements) > max_allocation_amount))
+		// Otherwise need to check all group sizes, because append might append smaller blocks to the end of a larger block:
+		for (group_pointer_type current = first_group; current != NULL; current = current->next_group)
 		{
-			consolidate();
+			if (current->capacity < min || current->capacity > max)
+			{
+				#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT // If type is non-copyable/movable, cannot be consolidated, throw exception:
+					if PLF_STACK_CONSTEXPR (!((std::is_copy_constructible<element_type>::value && std::is_copy_assignable<element_type>::value) || (std::is_move_constructible<element_type>::value && std::is_move_assignable<element_type>::value)))
+					{
+						throw;
+					}
+					else
+				#endif
+				{
+					consolidate();
+				}
+
+				return;
+			}
 		}
-	}
-
-
-
-	inline void set_minimum_block_capacity(const size_type min_allocation_amount)
-	{
-		set_block_capacity_limits(min_allocation_amount, group_allocator_pair.max_elements_per_group);
-	}
-
-
-
-	inline void set_maximum_block_capacity(const size_type max_allocation_amount)
-	{
-		set_block_capacity_limits(min_elements_per_group, max_allocation_amount);
 	}
 
 
@@ -1198,7 +1223,7 @@ private:
 		#ifdef PLF_STACK_TYPE_TRAITS_SUPPORT
 			if PLF_STACK_CONSTEXPR (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
 			{
-				std::memset(static_cast<void *>(this), 0, offsetof(stack, min_elements_per_group));
+				std::memset(static_cast<void *>(this), 0, offsetof(stack, min_block_capacity));
 			}
 			else
 		#endif
@@ -1277,7 +1302,7 @@ public:
 
 
 	// Remove trailing stack groups (not removed in general 'pop' usage for performance reasons)
-	void free_unused_memory() PLF_STACK_NOEXCEPT
+	void trim() PLF_STACK_NOEXCEPT
 	{
 		if (current_group == NULL) // ie. stack is empty
 		{
@@ -1310,10 +1335,10 @@ public:
 			return;
 		}
 
-		const size_type original_min_elements = min_elements_per_group;
-		min_elements_per_group = (total_number_of_elements < min_elements_per_group) ? min_elements_per_group : ((total_number_of_elements < group_allocator_pair.max_elements_per_group) ? total_number_of_elements : group_allocator_pair.max_elements_per_group);
+		const size_type original_min_elements = min_block_capacity;
+		min_block_capacity = (total_number_of_elements < min_block_capacity) ? min_block_capacity : ((total_number_of_elements < group_allocator_pair.max_block_capacity) ? total_number_of_elements : group_allocator_pair.max_block_capacity);
 		consolidate();
-		min_elements_per_group = original_min_elements;
+		min_block_capacity = original_min_elements;
 	}
 
 
@@ -1325,21 +1350,21 @@ public:
 			return;
 		}
 
-		if (reserve_amount > group_allocator_pair.max_elements_per_group)
+		if (reserve_amount > group_allocator_pair.max_block_capacity)
 		{
-			reserve_amount = group_allocator_pair.max_elements_per_group;
+			reserve_amount = group_allocator_pair.max_block_capacity;
 		}
-		else if (reserve_amount < min_elements_per_group)
+		else if (reserve_amount < min_block_capacity)
 		{
-			reserve_amount = min_elements_per_group;
+			reserve_amount = min_block_capacity;
 		}
 		else if (reserve_amount > max_size())
 		{
 			reserve_amount = max_size();
 		}
 
-		const size_type original_min_elements = min_elements_per_group;
-		min_elements_per_group = reserve_amount;
+		const size_type original_min_elements = min_block_capacity;
+		min_block_capacity = reserve_amount;
 
 		if (first_group == NULL) // If this is a newly-created stack, no pushes yet
 		{
@@ -1351,7 +1376,7 @@ public:
 			consolidate();
 		}
 
-		min_elements_per_group = original_min_elements;
+		min_block_capacity = original_min_elements;
 	}
 
 
@@ -1469,8 +1494,8 @@ public:
 		}
 
 		// Trim trailing groups on both, link source and destinations groups and remove references to source groups from source:
-		source.free_unused_memory();
-        free_unused_memory();
+		source.trim();
+      trim();
 
 
 		current_group->next_group = source.first_group;
@@ -1482,14 +1507,14 @@ public:
 		end_element = source.end_element;
 
 		// Correct group sizes if necessary:
-		if (source.min_elements_per_group < min_elements_per_group)
+		if (source.min_block_capacity < min_block_capacity)
 		{
-			min_elements_per_group = source.min_elements_per_group;
+			min_block_capacity = source.min_block_capacity;
 		}
 
-		if (source.group_allocator_pair.max_elements_per_group < group_allocator_pair.max_elements_per_group)
+		if (source.group_allocator_pair.max_block_capacity < group_allocator_pair.max_block_capacity)
 		{
-			group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
+			group_allocator_pair.max_block_capacity = source.group_allocator_pair.max_block_capacity;
 		}
 
 		source.blank();
@@ -1520,7 +1545,7 @@ public:
 		{
 			const group_pointer_type	swap_current_group = current_group, swap_first_group = first_group;
 			const element_pointer_type	swap_top_element = top_element, swap_start_element = start_element, swap_end_element = end_element;
-			const size_type				swap_total_number_of_elements = total_number_of_elements, swap_min_elements_per_group = min_elements_per_group, swap_max_elements_per_group = group_allocator_pair.max_elements_per_group;
+			const size_type				swap_total_number_of_elements = total_number_of_elements, swap_min_block_capacity = min_block_capacity, swap_max_block_capacity = group_allocator_pair.max_block_capacity;
 
 			current_group = source.current_group;
 			first_group = source.first_group;
@@ -1528,8 +1553,8 @@ public:
 			start_element = source.start_element;
 			end_element = source.end_element;
 			total_number_of_elements = source.total_number_of_elements;
-			min_elements_per_group = source.min_elements_per_group;
-			group_allocator_pair.max_elements_per_group = source.group_allocator_pair.max_elements_per_group;
+			min_block_capacity = source.min_block_capacity;
+			group_allocator_pair.max_block_capacity = source.group_allocator_pair.max_block_capacity;
 
 			source.current_group = swap_current_group;
 			source.first_group = swap_first_group;
@@ -1537,8 +1562,8 @@ public:
 			source.start_element = swap_start_element;
 			source.end_element = swap_end_element;
 			source.total_number_of_elements = swap_total_number_of_elements;
-			source.min_elements_per_group = swap_min_elements_per_group;
-			source.group_allocator_pair.max_elements_per_group = swap_max_elements_per_group;
+			source.min_block_capacity = swap_min_block_capacity;
+			source.group_allocator_pair.max_block_capacity = swap_max_block_capacity;
 		}
 	}
 
@@ -1561,7 +1586,6 @@ inline void swap (plf::stack<element_type, element_allocator_type> &a, plf::stac
 
 
 #undef PLF_STACK_FORCE_INLINE
-
 #undef PLF_STACK_ALIGNMENT_SUPPORT
 #undef PLF_STACK_INITIALIZER_LIST_SUPPORT
 #undef PLF_STACK_TYPE_TRAITS_SUPPORT
@@ -1572,8 +1596,8 @@ inline void swap (plf::stack<element_type, element_allocator_type> &a, plf::stac
 #undef PLF_STACK_NOEXCEPT_SWAP
 #undef PLF_STACK_NOEXCEPT_MOVE_ASSIGNMENT
 #undef PLF_STACK_CONSTEXPR
-#undef PLF_STACK_CONSTEXPR_SUPPORT
 #undef PLF_STACK_CPP20_SUPPORT
+#undef PLF_STACK_STATIC_ASSERT
 
 #undef PLF_STACK_CONSTRUCT
 #undef PLF_STACK_DESTROY
