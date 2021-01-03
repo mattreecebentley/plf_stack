@@ -83,7 +83,7 @@
 	#include <utility> // std::move
 #endif
 
-#include "plf_pcgrand.h"
+#include "plf_rand.h"
 #include "plf_stack.h"
 
 
@@ -230,7 +230,7 @@ int main()
 
 			do
 			{
-				if ((pcg_rand() & 3) == 0)
+				if ((plf::rand() & 3) == 0)
 				{
 					i_stack.push(10);
 				}
