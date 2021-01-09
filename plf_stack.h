@@ -1,4 +1,4 @@
-// Copyright (c) 2020, Matthew Bentley (mattreecebentley@gmail.com) www.plflib.org
+// Copyright (c) 2021, Matthew Bentley (mattreecebentley@gmail.com) www.plflib.org
 
 // zLib license (https://www.zlib.net/zlib_license.html):
 // This software is provided 'as-is', without any express or implied
@@ -10,11 +10,11 @@
 // freely, subject to the following restrictions:
 //
 // 1. The origin of this software must not be misrepresented; you must not
-//    claim that you wrote the original software. If you use this software
-//    in a product, an acknowledgement in the product documentation would be
-//    appreciated but is not required.
+// 	claim that you wrote the original software. If you use this software
+// 	in a product, an acknowledgement in the product documentation would be
+// 	appreciated but is not required.
 // 2. Altered source versions must be plainly marked as such, and must not be
-//    misrepresented as being the original software.
+// 	misrepresented as being the original software.
 // 3. This notice may not be removed or altered from any source distribution.
 
 
@@ -126,7 +126,7 @@
 			#define PLF_STACK_STATIC_ASSERT(check, message) static_assert(check, message)
 		#else
 			#define PLF_STACK_STATIC_ASSERT(check, message) assert(check)
-   	#endif
+		#endif
 		#if __has_feature(cxx_variadic_templates) && !defined(_LIBCPP_HAS_NO_VARIADICS)
 			#define PLF_STACK_VARIADICS_SUPPORT
 		#endif
@@ -215,7 +215,6 @@
 
 	#define PLF_STACK_DESTROY(the_allocator, allocator_instance, location) 				std::allocator_traits<the_allocator>::destroy(allocator_instance, location)
 	#define PLF_STACK_ALLOCATE(the_allocator, allocator_instance, size, hint) 			std::allocator_traits<the_allocator>::allocate(allocator_instance, size, hint)
- 	#define PLF_STACK_ALLOCATE_INITIALIZATION(the_allocator, size, hint) 				std::allocator_traits<the_allocator>::allocate(*this, size, hint)
 	#define PLF_STACK_DEALLOCATE(the_allocator, allocator_instance, location, size) 	std::allocator_traits<the_allocator>::deallocate(allocator_instance, location, size)
 #else
 	#ifdef PLF_STACK_VARIADICS_SUPPORT
@@ -226,7 +225,6 @@
 
 	#define PLF_STACK_DESTROY(the_allocator, allocator_instance, location) 			allocator_instance.destroy(location)
 	#define PLF_STACK_ALLOCATE(the_allocator, allocator_instance, size, hint)	 		allocator_instance.allocate(size, hint)
-	#define PLF_STACK_ALLOCATE_INITIALIZATION(the_allocator, size, hint) 				the_allocator::allocate(size, hint)
 	#define PLF_STACK_DEALLOCATE(the_allocator, allocator_instance, location, size) 	allocator_instance.deallocate(location, size)
 #endif
 
@@ -234,10 +232,11 @@
 
 
 
-#include <cstring>	// memset, memcpy
-#include <cassert>	// assert
+#include <cstring> // memset, memcpy
+#include <cassert> // assert
 #include <limits>  // std::numeric_limits
-#include <memory>	// std::uninitialized_copy, std::allocator
+#include <memory> // std::uninitialized_copy, std::allocator
+#include <stdexcept> // std::length_error
 
 
 #ifdef PLF_STACK_MOVE_SEMANTICS_SUPPORT
@@ -255,17 +254,17 @@
 namespace plf
 {
 
-template <class element_type, class element_allocator_type = std::allocator<element_type> > class stack : private element_allocator_type  // Empty base class optimisation - inheriting allocator functions
+template <class element_type, class element_allocator_type = std::allocator<element_type> > class stack : private element_allocator_type // Empty base class optimisation - inheriting allocator functions
 {
 public:
 	// Standard container typedefs:
-	typedef element_type																value_type;
-	typedef element_allocator_type														allocator_type;
+	typedef element_type																					value_type;
+	typedef element_allocator_type																	allocator_type;
 
 	#ifdef PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
 		typedef typename std::allocator_traits<element_allocator_type>::size_type		size_type;
-		typedef element_type &															reference;
-		typedef const element_type &													const_reference;
+		typedef element_type &																			reference;
+		typedef const element_type &																	const_reference;
 		typedef typename std::allocator_traits<element_allocator_type>::pointer 		pointer;
 		typedef typename std::allocator_traits<element_allocator_type>::const_pointer	const_pointer;
 	#else
@@ -273,7 +272,7 @@ public:
 		typedef typename element_allocator_type::reference			reference;
 		typedef typename element_allocator_type::const_reference	const_reference;
 		typedef typename element_allocator_type::pointer			pointer;
-		typedef typename element_allocator_type::const_pointer		const_pointer;
+		typedef typename element_allocator_type::const_pointer	const_pointer;
 	#endif
 
 private:
@@ -281,24 +280,25 @@ private:
 
 	#ifdef PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
 		typedef typename std::allocator_traits<element_allocator_type>::template rebind_alloc<group> group_allocator_type;
-		typedef typename std::allocator_traits<group_allocator_type>::pointer		group_pointer_type;
-		typedef typename std::allocator_traits<element_allocator_type>::pointer 	element_pointer_type;
+		typedef typename std::allocator_traits<group_allocator_type>::pointer								group_pointer_type;
+		typedef typename std::allocator_traits<element_allocator_type>::pointer 							element_pointer_type;
 	#else
 		typedef typename element_allocator_type::template rebind<group>::other	group_allocator_type;
-		typedef typename group_allocator_type::pointer							group_pointer_type;
-		typedef typename element_allocator_type::pointer						element_pointer_type;
+		typedef typename group_allocator_type::pointer									group_pointer_type;
+		typedef typename element_allocator_type::pointer								element_pointer_type;
 	#endif
+
 
 	struct group : private element_allocator_type
 	{
 		const element_pointer_type		elements;
 		group_pointer_type				next_group, previous_group;
-		const element_pointer_type		end; // End is the actual end element of the group, not one-past the end element as it is in list
+		const element_pointer_type		end; // End is actually the back element of the group, not one-past the back element as it is in list
 
 
 		#ifdef PLF_STACK_VARIADICS_SUPPORT
 			group(const size_type elements_per_group, group_pointer_type const previous = NULL):
-				elements(PLF_STACK_ALLOCATE_INITIALIZATION(element_allocator_type, elements_per_group, (previous == NULL) ? 0 : previous->elements)),
+				elements(PLF_STACK_ALLOCATE(element_allocator_type, (*this), elements_per_group, (previous == NULL) ? 0 : previous->elements)),
 				next_group(NULL),
 				previous_group(previous),
 				end(elements + elements_per_group - 1)
@@ -318,7 +318,7 @@ private:
 			// Not a real copy constructor ie. actually a move constructor. Only used for allocator.construct in C++03 for reasons stated above:
 			group(const group &source):
 				element_allocator_type(source),
-				elements(PLF_STACK_ALLOCATE_INITIALIZATION(element_allocator_type, reinterpret_cast<size_type>(source.next_group), (source.previous_group == NULL) ? 0 : source.previous_group->elements)),
+				elements(PLF_STACK_ALLOCATE(element_allocator_type, (*this), reinterpret_cast<size_type>(source.next_group), (source.previous_group == NULL) ? 0 : source.previous_group->elements)),
 				next_group(NULL),
 				previous_group(source.previous_group),
 				end(elements + reinterpret_cast<size_type>(source.next_group) - 1)
@@ -1080,10 +1080,10 @@ public:
 	inline size_type max_size() const PLF_STACK_NOEXCEPT
 	{
 		#ifdef PLF_STACK_ALLOCATOR_TRAITS_SUPPORT
-      	return std::allocator_traits<element_allocator_type>::max_size(*this);
+			return std::allocator_traits<element_allocator_type>::max_size(*this);
 		#else
-      	return element_allocator_type::max_size();
-      #endif
+			return element_allocator_type::max_size();
+		#endif
 	}
 
 
@@ -1522,7 +1522,7 @@ public:
 
 		// Trim trailing groups on both, link source and destinations groups and remove references to source groups from source:
 		source.trim();
-      trim();
+		trim();
 
 
 		current_group->next_group = source.first_group;
@@ -1629,7 +1629,7 @@ inline void swap (plf::stack<element_type, element_allocator_type> &a, plf::stac
 #undef PLF_STACK_CONSTRUCT
 #undef PLF_STACK_DESTROY
 #undef PLF_STACK_ALLOCATE
-#undef PLF_STACK_ALLOCATE_INITIALIZATION
 #undef PLF_STACK_DEALLOCATE
 
 #endif // PLF_STACK_H
+
