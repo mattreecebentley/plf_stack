@@ -1,67 +1,67 @@
 #if defined(_MSC_VER)
 	#if _MSC_VER >= 1600
-		#define PLF_MOVE_SEMANTICS_SUPPORT
+		#define PLF_TEST_MOVE_SEMANTICS_SUPPORT
 	#endif
 	#if _MSC_VER >= 1700
-		#define PLF_TYPE_TRAITS_SUPPORT
+		#define PLF_TEST_TYPE_TRAITS_SUPPORT
 	#endif
 	#if _MSC_VER >= 1800
-		#define PLF_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
-		#define PLF_INITIALIZER_LIST_SUPPORT
+		#define PLF_TEST_VARIADICS_SUPPORT // Variadics, in this context, means both variadic templates and variadic macros are supported
+		#define PLF_TEST_INITIALIZER_LIST_SUPPORT
 	#endif
 
 	#if defined(_MSVC_LANG) && (_MSVC_LANG > 201703L)
-		#define PLF_CPP20_SUPPORT
+		#define PLF_TEST_CPP20_SUPPORT
 	#endif
 #elif defined(__cplusplus) && __cplusplus >= 201103L // C++11 support, at least
-	#define PLF_MOVE_SEMANTICS_SUPPORT
+	#define PLF_TEST_MOVE_SEMANTICS_SUPPORT
 
 	#if defined(__GNUC__) && defined(__GNUC_MINOR__) && !defined(__clang__) // If compiler is GCC/G++
 		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 3) || __GNUC__ > 4 // 4.2 and below do not support variadic templates
-			#define PLF_MOVE_SEMANTICS_SUPPORT
-			#define PLF_VARIADICS_SUPPORT
+			#define PLF_TEST_MOVE_SEMANTICS_SUPPORT
+			#define PLF_TEST_VARIADICS_SUPPORT
 		#endif
 		#if (__GNUC__ == 4 && __GNUC_MINOR__ >= 4) || __GNUC__ > 4 // 4.3 and below do not support initializer lists
-			#define PLF_INITIALIZER_LIST_SUPPORT
+			#define PLF_TEST_INITIALIZER_LIST_SUPPORT
 		#endif
 		#if __GNUC__ >= 5 // GCC v4.9 and below do not support std::is_trivially_copyable
-			#define PLF_TYPE_TRAITS_SUPPORT
+			#define PLF_TEST_TYPE_TRAITS_SUPPORT
 		#endif
 	#elif defined(__clang__) && !defined(__GLIBCXX__) && !defined(_LIBCPP_CXX03_LANG)
 		#if __clang_major__ >= 3 // clang versions < 3 don't support __has_feature() or traits
-			#define PLF_TYPE_TRAITS_SUPPORT
+			#define PLF_TEST_TYPE_TRAITS_SUPPORT
 
 			#if __has_feature(cxx_rvalue_references) && !defined(_LIBCPP_HAS_NO_RVALUE_REFERENCES)
-				#define PLF_MOVE_SEMANTICS_SUPPORT
+				#define PLF_TEST_MOVE_SEMANTICS_SUPPORT
 			#endif
 			#if __has_feature(cxx_variadic_templates) && !defined(_LIBCPP_HAS_NO_VARIADICS)
-				#define PLF_VARIADICS_SUPPORT
+				#define PLF_TEST_VARIADICS_SUPPORT
 			#endif
 			#if (__clang_major__ == 3 && __clang_minor__ >= 1) || __clang_major__ > 3
-				#define PLF_INITIALIZER_LIST_SUPPORT
+				#define PLF_TEST_INITIALIZER_LIST_SUPPORT
 			#endif
 		#endif
 	#elif defined(__GLIBCXX__)
 		#if __GLIBCXX__ >= 20080606
-			#define PLF_MOVE_SEMANTICS_SUPPORT
-			#define PLF_VARIADICS_SUPPORT
+			#define PLF_TEST_MOVE_SEMANTICS_SUPPORT
+			#define PLF_TEST_VARIADICS_SUPPORT
 		#endif
 		#if __GLIBCXX__ >= 20090421
-			#define PLF_INITIALIZER_LIST_SUPPORT
+			#define PLF_TEST_INITIALIZER_LIST_SUPPORT
 		#endif
 		#if __GLIBCXX__ >= 20150422
-			#define PLF_TYPE_TRAITS_SUPPORT
+			#define PLF_TEST_TYPE_TRAITS_SUPPORT
 		#endif
 	#elif !(defined(_LIBCPP_CXX03_LANG) || defined(_LIBCPP_HAS_NO_RVALUE_REFERENCES) || defined(_LIBCPP_HAS_NO_VARIADICS))
 		// Assume full support for other compilers and standard libraries
-		#define PLF_VARIADICS_SUPPORT
-		#define PLF_TYPE_TRAITS_SUPPORT
-		#define PLF_MOVE_SEMANTICS_SUPPORT
-		#define PLF_INITIALIZER_LIST_SUPPORT
+		#define PLF_TEST_VARIADICS_SUPPORT
+		#define PLF_TEST_TYPE_TRAITS_SUPPORT
+		#define PLF_TEST_MOVE_SEMANTICS_SUPPORT
+		#define PLF_TEST_INITIALIZER_LIST_SUPPORT
 	#endif
 
 	#if __cplusplus > 201703L && ((defined(__clang__) && (__clang_major__ >= 10)) || (defined(__GNUC__) && __GNUC__ >= 10) || (!defined(__clang__) && !defined(__GNUC__))) // assume correct C++20 implementation for other compilers
-		#define PLF_CPP20_SUPPORT
+		#define PLF_TEST_CPP20_SUPPORT
 	#endif
 #endif
 
@@ -70,7 +70,7 @@
 #include <cstdio> // log redirection
 #include <cstdlib> // abort
 
-#ifdef PLF_MOVE_SEMANTICS_SUPPORT
+#ifdef PLF_TEST_MOVE_SEMANTICS_SUPPORT
 	#include <utility> // std::move
 #endif
 
@@ -111,7 +111,7 @@ void failpass(const char *test_type, bool condition)
 
 
 
-#ifdef PLF_VARIADICS_SUPPORT
+#ifdef PLF_TEST_VARIADICS_SUPPORT
 	struct perfect_forwarding_test
 	{
 		const bool success;
@@ -172,7 +172,7 @@ int main()
 			failpass("Reserve test", i_stack3.size() == 250000);
 
 
-			#ifdef PLF_MOVE_SEMANTICS_SUPPORT
+			#ifdef PLF_TEST_MOVE_SEMANTICS_SUPPORT
 				stack<unsigned int> i_stack4;
 				i_stack4 = std::move(i_stack3);
 				failpass("Move equality operator test", i_stack2 == i_stack4);
@@ -233,7 +233,7 @@ int main()
 
 			failpass("Randomly pop/push till empty test", i_stack.empty());
 
-			#ifdef PLF_VARIADICS_SUPPORT
+			#ifdef PLF_TEST_VARIADICS_SUPPORT
 				i_stack.emplace(20);
 				failpass("Emplace test", i_stack.size() == 1);
 			#endif
@@ -263,7 +263,7 @@ int main()
 		}
 
 
-		#ifdef PLF_VARIADICS_SUPPORT
+		#ifdef PLF_TEST_VARIADICS_SUPPORT
 		{
 			title2("Perfect Forwarding tests");
 
