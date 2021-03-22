@@ -56,7 +56,7 @@
 		#define PLF_CONSTEXPR
 	#endif
 
-	#if defined(_MSVC_LANG) && (_MSVC_LANG > 201703L)
+	#if defined(_MSVC_LANG) && (_MSVC_LANG > 201703L) && _MSC_VER >= 1923
 		#define PLF_CPP20_SUPPORT
 	#endif
 #elif defined(__cplusplus) && __cplusplus >= 201103L // C++11 support, at least
@@ -192,7 +192,6 @@
 #undef PLF_IS_ALWAYS_EQUAL_SUPPORT
 
 
-
 #ifdef PLF_ALLOCATOR_TRAITS_SUPPORT
 	#ifdef PLF_VARIADICS_SUPPORT
 		#define PLF_CONSTRUCT(the_allocator, allocator_instance, location, ...)	std::allocator_traits<the_allocator>::construct(allocator_instance, location, __VA_ARGS__)
@@ -205,14 +204,14 @@
 	#define PLF_DEALLOCATE(the_allocator, allocator_instance, location, size) 	std::allocator_traits<the_allocator>::deallocate(allocator_instance, location, size)
 #else
 	#ifdef PLF_VARIADICS_SUPPORT
-		#define PLF_CONSTRUCT(the_allocator, allocator_instance, location, ...)		allocator_instance.construct(location, __VA_ARGS__)
+		#define PLF_CONSTRUCT(the_allocator, allocator_instance, location, ...)		(allocator_instance).construct(location, __VA_ARGS__)
 	#else
-		#define PLF_CONSTRUCT(the_allocator, allocator_instance, location, data)	allocator_instance.construct(location, data)
+		#define PLF_CONSTRUCT(the_allocator, allocator_instance, location, data)	(allocator_instance).construct(location, data)
 	#endif
 
-	#define PLF_DESTROY(the_allocator, allocator_instance, location) 				allocator_instance.destroy(location)
-	#define PLF_ALLOCATE(the_allocator, allocator_instance, size, hint)	 		allocator_instance.allocate(size, hint)
-	#define PLF_DEALLOCATE(the_allocator, allocator_instance, location, size)	allocator_instance.deallocate(location, size)
+	#define PLF_DESTROY(the_allocator, allocator_instance, location) 				(allocator_instance).destroy(location)
+	#define PLF_ALLOCATE(the_allocator, allocator_instance, size, hint)	 		(allocator_instance).allocate(size, hint)
+	#define PLF_DEALLOCATE(the_allocator, allocator_instance, location, size)	(allocator_instance).deallocate(location, size)
 #endif
 
 
@@ -284,7 +283,7 @@ private:
 
 		#ifdef PLF_VARIADICS_SUPPORT
 			group(const size_type elements_per_group, group_pointer_type const previous = NULL):
-				elements(PLF_ALLOCATE(element_allocator_type, (*this), elements_per_group, (previous == NULL) ? 0 : previous->elements)),
+				elements(PLF_ALLOCATE(element_allocator_type, *this, elements_per_group, (previous == NULL) ? 0 : previous->elements)),
 				next_group(NULL),
 				previous_group(previous),
 				end(elements + elements_per_group - 1)
@@ -304,7 +303,7 @@ private:
 			// Not a real copy constructor ie. actually a move constructor. Only used for allocator.construct in C++03 for reasons stated above:
 			group(const group &source):
 				element_allocator_type(source),
-				elements(PLF_ALLOCATE(element_allocator_type, (*this), reinterpret_cast<size_type>(source.next_group), (source.previous_group == NULL) ? 0 : source.previous_group->elements)),
+				elements(PLF_ALLOCATE(element_allocator_type, *this, reinterpret_cast<size_type>(source.next_group), (source.previous_group == NULL) ? 0 : source.previous_group->elements)),
 				next_group(NULL),
 				previous_group(source.previous_group),
 				end(elements + reinterpret_cast<size_type>(source.next_group) - 1)
@@ -316,7 +315,7 @@ private:
 		~group() PLF_NOEXCEPT
 		{
 			// Null check not necessary (for empty group and copied group as above) as delete will ignore.
-			PLF_DEALLOCATE(element_allocator_type, (*this), elements, static_cast<size_type>((end - elements) + 1)); // Size is calculated from end and elements
+			PLF_DEALLOCATE(element_allocator_type, *this, elements, static_cast<size_type>((end - elements) + 1)); // Size is calculated from end and elements
 		}
 	};
 
@@ -328,7 +327,7 @@ private:
 	{
 		size_type max_block_capacity;
 		explicit ebco_pair(const size_type max_elements) PLF_NOEXCEPT: max_block_capacity(max_elements) {};
-	}						group_allocator_pair;
+	}								group_allocator_pair;
 
 
 
@@ -370,6 +369,7 @@ public:
 			throw std::length_error("Supplied memory block capacities outside of allowable ranges");
 		}
 	}
+
 
 
 	// Constructor with minimum & maximum group size parameters:
@@ -560,7 +560,7 @@ private:
 
 					for (element_pointer_type element_pointer = first_group->elements; element_pointer != past_end; ++element_pointer)
 					{
-						PLF_DESTROY(element_allocator_type, (*this), element_pointer);
+						PLF_DESTROY(element_allocator_type, *this, element_pointer);
 					}
 
 					const group_pointer_type next_group = first_group->next_group;
@@ -574,7 +574,7 @@ private:
 
 				for (element_pointer_type element_pointer = start_element; element_pointer != past_end; ++element_pointer)
 				{
-					PLF_DESTROY(element_allocator_type, (*this), element_pointer);
+					PLF_DESTROY(element_allocator_type, *this, element_pointer);
 				}
 
 				first_group = first_group->next_group;
@@ -633,14 +633,14 @@ public:
 				#ifdef PLF_TYPE_TRAITS_SUPPORT
 					if PLF_CONSTEXPR (std::is_nothrow_copy_constructible<element_type>::value)
 					{
-						PLF_CONSTRUCT(element_allocator_type, (*this), ++top_element, element);
+						PLF_CONSTRUCT(element_allocator_type, *this, ++top_element, element);
 					}
 					else
 				#endif
 				{
 					try
 					{
-						PLF_CONSTRUCT(element_allocator_type, (*this), ++top_element, element);
+						PLF_CONSTRUCT(element_allocator_type, *this, ++top_element, element);
 					}
 					catch (...)
 					{
@@ -680,14 +680,14 @@ public:
 				#ifdef PLF_TYPE_TRAITS_SUPPORT
 					if PLF_CONSTEXPR (std::is_nothrow_copy_constructible<element_type>::value)
 					{
-						PLF_CONSTRUCT(element_allocator_type, (*this), top_element, element);
+						PLF_CONSTRUCT(element_allocator_type, *this, top_element, element);
 					}
 					else
 				#endif
 				{
 					try
 					{
-						PLF_CONSTRUCT(element_allocator_type, (*this), top_element, element);
+						PLF_CONSTRUCT(element_allocator_type, *this, top_element, element);
 					}
 					catch (...)
 					{
@@ -710,14 +710,14 @@ public:
 				#ifdef PLF_TYPE_TRAITS_SUPPORT
 					if PLF_CONSTEXPR (std::is_nothrow_copy_constructible<element_type>::value)
 					{
-						PLF_CONSTRUCT(element_allocator_type, (*this), top_element, element);
+						PLF_CONSTRUCT(element_allocator_type, *this, top_element, element);
 					}
 					else
 				#endif
 				{
 					try
 					{
-						PLF_CONSTRUCT(element_allocator_type, (*this), top_element, element);
+						PLF_CONSTRUCT(element_allocator_type, *this, top_element, element);
 					}
 					catch (...)
 					{
@@ -746,14 +746,14 @@ public:
 					#ifdef PLF_TYPE_TRAITS_SUPPORT
 						if PLF_CONSTEXPR (std::is_nothrow_move_constructible<element_type>::value)
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), ++top_element, std::move(element));
+							PLF_CONSTRUCT(element_allocator_type, *this, ++top_element, std::move(element));
 						}
 						else
 					#endif
 					{
 						try
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), ++top_element, std::move(element));
+							PLF_CONSTRUCT(element_allocator_type, *this, ++top_element, std::move(element));
 						}
 						catch (...)
 						{
@@ -793,14 +793,14 @@ public:
 					#ifdef PLF_TYPE_TRAITS_SUPPORT
 						if PLF_CONSTEXPR (std::is_nothrow_move_constructible<element_type>::value)
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(element));
+							PLF_CONSTRUCT(element_allocator_type, *this, top_element, std::move(element));
 						}
 						else
 					#endif
 					{
 						try
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(element));
+							PLF_CONSTRUCT(element_allocator_type, *this, top_element, std::move(element));
 						}
 						catch (...)
 						{
@@ -823,14 +823,14 @@ public:
 					#ifdef PLF_TYPE_TRAITS_SUPPORT
 						if PLF_CONSTEXPR (std::is_nothrow_move_constructible<element_type>::value)
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(element));
+							PLF_CONSTRUCT(element_allocator_type, *this, top_element, std::move(element));
 						}
 						else
 					#endif
 					{
 						try
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), top_element, std::move(element));
+							PLF_CONSTRUCT(element_allocator_type, *this, top_element, std::move(element));
 						}
 						catch (...)
 						{
@@ -861,14 +861,14 @@ public:
 					#ifdef PLF_TYPE_TRAITS_SUPPORT
 						if PLF_CONSTEXPR (std::is_nothrow_constructible<element_type, arguments ...>::value)
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), ++top_element, std::forward<arguments>(parameters)...);
+							PLF_CONSTRUCT(element_allocator_type, *this, ++top_element, std::forward<arguments>(parameters)...);
 						}
 						else
 					#endif
 					{
 						try
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), ++top_element, std::forward<arguments>(parameters)...);
+							PLF_CONSTRUCT(element_allocator_type, *this, ++top_element, std::forward<arguments>(parameters)...);
 						}
 						catch (...)
 						{
@@ -904,14 +904,14 @@ public:
 					#ifdef PLF_TYPE_TRAITS_SUPPORT
 						if PLF_CONSTEXPR (std::is_nothrow_constructible<element_type, arguments ...>::value)
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), top_element, std::forward<arguments>(parameters)...);
+							PLF_CONSTRUCT(element_allocator_type, *this, top_element, std::forward<arguments>(parameters)...);
 						}
 						else
 					#endif
 					{
 						try
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), top_element, std::forward<arguments>(parameters)...);
+							PLF_CONSTRUCT(element_allocator_type, *this, top_element, std::forward<arguments>(parameters)...);
 						}
 						catch (...)
 						{
@@ -934,14 +934,14 @@ public:
 					#ifdef PLF_TYPE_TRAITS_SUPPORT
 						if PLF_CONSTEXPR (std::is_nothrow_constructible<element_type, arguments ...>::value)
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), top_element, std::forward<arguments>(parameters)...);
+							PLF_CONSTRUCT(element_allocator_type, *this, top_element, std::forward<arguments>(parameters)...);
 						}
 						else
 					#endif
 					{
 						try
 						{
-							PLF_CONSTRUCT(element_allocator_type, (*this), top_element, std::forward<arguments>(parameters)...);
+							PLF_CONSTRUCT(element_allocator_type, *this, top_element, std::forward<arguments>(parameters)...);
 						}
 						catch (...)
 						{
@@ -977,7 +977,7 @@ public:
 			if PLF_CONSTEXPR (!std::is_trivially_destructible<element_type>::value)
 		#endif
 		{
-			PLF_DESTROY(element_allocator_type, (*this), top_element);
+			PLF_DESTROY(element_allocator_type, *this, top_element);
 		}
 
 		// ie. if total_number_of_elements != 0 after decrement, or we were not already at the start of a non-first group
@@ -1249,6 +1249,7 @@ private:
 			total_number_of_elements = 0;
 		}
 	}
+
 
 
 public:
