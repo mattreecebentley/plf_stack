@@ -172,6 +172,20 @@ int main()
 			failpass("Reserve test", i_stack3.size() == 250000);
 
 
+			stack<unsigned int> i_stack7(50, 50);
+			
+			for (unsigned int temp = 0; temp != 449; ++temp)
+			{
+				i_stack7.push(10);
+			}
+			
+			failpass("Max limit test", i_stack7.capacity() == 450);
+			
+			i_stack7.reshape(100, 100);
+			
+			failpass("Reshape test", i_stack7.capacity() == 500);
+			
+
 			#ifdef PLF_TEST_MOVE_SEMANTICS_SUPPORT
 				stack<unsigned int> i_stack4;
 				i_stack4 = std::move(i_stack3);
