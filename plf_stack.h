@@ -278,7 +278,7 @@ private:
 	{
 		const element_pointer_type		elements;
 		group_pointer_type				next_group, previous_group;
-		const element_pointer_type		end; // End is actually the back element of the group, not one-past the back element as it is in list
+		const element_pointer_type		end; // One-past the back element
 
 
 		#ifdef PLF_VARIADICS_SUPPORT
@@ -292,7 +292,7 @@ private:
 
 		#else
 			// This is a hack around the fact that element_allocator_type::construct only supports copy construction in C++03 and copy elision does not occur on the vast majority of compilers in this circumstance. And to avoid running out of memory (and performance loss) from allocating the same block twice, we're allocating in this constructor and moving data in the copy constructor.
-			group(const size_type elements_per_group, group_pointer_type const previous = NULL) PLF_NOEXCEPT:
+			group(const size_type elements_per_group, group_pointer_type const previous) PLF_NOEXCEPT:
 				elements(NULL),
 				next_group(reinterpret_cast<group_pointer_type>(elements_per_group)),
 				previous_group(previous),
@@ -314,14 +314,14 @@ private:
 
 		~group() PLF_NOEXCEPT
 		{
-			// Null check not necessary (for empty group and copied group as above) as delete will ignore.
-			PLF_DEALLOCATE(element_allocator_type, *this, elements, static_cast<size_type>((end - elements) + 1)); // Size is calculated from end and elements
+			// Null check not necessary (for empty group and copied group as above) as deallocate will do it's own null check.
+			PLF_DEALLOCATE(element_allocator_type, *this, elements, static_cast<size_type>(end - elements));
 		}
 	};
 
 
-	group_pointer_type		current_group, first_group;
-	element_pointer_type		top_element, start_element, end_element;
+	group_pointer_type		current_group, first_group; // current group is location of top pointer, first_group is 'front' group, saves performance for ~stack etc
+	element_pointer_type		top_element, start_element, end_element; // start_element/end_element cache current_group->end/elements for better performance
 	size_type					total_size, total_capacity, min_block_capacity;
 	struct ebco_pair : group_allocator_type // Packaging the group allocator with the least-used member variable, for empty-base-class optimization
 	{
@@ -329,6 +329,18 @@ private:
 		explicit ebco_pair(const size_type max_elements) PLF_NOEXCEPT: max_block_capacity(max_elements) {};
 	}								group_allocator_pair;
 
+
+
+	inline void check_capacities_conformance(const size_type min, const size_type max) const
+	{
+  		if (min < 2 || min > max || max > std::numeric_limits<size_type>::max())
+		{
+			throw std::length_error("Supplied memory block capacities outside of allowable ranges");
+		}
+	}
+
+
+	#define PLF_MIN_BLOCK_CAPACITY (sizeof(element_type) * 8 > (sizeof(*this) + sizeof(group)) * 2) ? 8 : (((sizeof(*this) + sizeof(group)) * 2) / sizeof(element_type)) + 1
 
 
 public:
@@ -343,7 +355,7 @@ public:
 		end_element(NULL),
 		total_size(0),
 		total_capacity(0),
-		min_block_capacity((sizeof(element_type) * 8 > (sizeof(*this) + sizeof(group)) * 2) ? 8 : (((sizeof(*this) + sizeof(group)) * 2) / sizeof(element_type)) + 1),
+		min_block_capacity(PLF_MIN_BLOCK_CAPACITY),
 		group_allocator_pair(std::numeric_limits<size_type>::max() / 2)
 	{}
 
@@ -358,19 +370,9 @@ public:
 		end_element(NULL),
 		total_size(0),
 		total_capacity(0),
-		min_block_capacity((sizeof(element_type) * 8 > (sizeof(*this) + sizeof(group)) * 2) ? 8 : (((sizeof(*this) + sizeof(group)) * 2) / sizeof(element_type)) + 1),
+		min_block_capacity(PLF_MIN_BLOCK_CAPACITY),
 		group_allocator_pair(std::numeric_limits<size_type>::max() / 2)
 	{}
-
-
-
-	inline void check_capacities_conformance(const size_type min, const size_type max) const
-	{
-  		if (min < 2 || min > max || max > std::numeric_limits<size_type>::max())
-		{
-			throw std::length_error("Supplied memory block capacities outside of allowable ranges");
-		}
-	}
 
 
 
@@ -412,11 +414,41 @@ public:
 
 private:
 
+	void allocate_new_group(const size_type capacity, group_pointer_type const previous_group)
+	{
+		previous_group->next_group = PLF_ALLOCATE(group_allocator_type, group_allocator_pair, 1, previous_group);
+
+		try
+		{
+			#ifdef PLF_VARIADICS_SUPPORT
+				PLF_CONSTRUCT(group_allocator_type, group_allocator_pair, previous_group->next_group, capacity, previous_group);
+			#else
+				PLF_CONSTRUCT(group_allocator_type, group_allocator_pair, previous_group->next_group, group(capacity, previous_group));
+			#endif
+		}
+		catch (...)
+		{
+			PLF_DEALLOCATE(group_allocator_type, group_allocator_pair, previous_group->next_group, 1);
+			throw;
+		}
+
+		total_capacity += capacity;
+	}
+
+
+
+	inline void deallocate_group(group_pointer_type const the_group) PLF_NOEXCEPT
+	{
+		PLF_DESTROY(group_allocator_type, group_allocator_pair, the_group);
+		PLF_DEALLOCATE(group_allocator_type, group_allocator_pair, the_group, 1);
+	}
+
+
+
 	void initialize()
 	{
 		first_group = current_group = PLF_ALLOCATE(group_allocator_type, group_allocator_pair, 1, 0);
 
-		// Initialize:
 		try
 		{
 			#ifdef PLF_VARIADICS_SUPPORT
@@ -439,7 +471,21 @@ private:
 
 
 
-	void copy_from_source(const stack &source)
+	inline void progress_to_next_group() // used by push/emplace
+	{
+		if (current_group->next_group == NULL) // no reserved groups or groups left over from previous pops, allocate new group
+		{
+			allocate_new_group((total_size < group_allocator_pair.max_block_capacity) ? total_size : group_allocator_pair.max_block_capacity, current_group);
+		}
+
+		current_group = current_group->next_group;
+		start_element = top_element = current_group->elements;
+		end_element = current_group->end;
+	}
+
+
+
+	void copy_from_source(const stack &source) // Note: this function is only called on an empty un-initialize()'d stack
 	{
 		assert(&source != this);
 
@@ -453,9 +499,10 @@ private:
 
 		if (total_size <= group_allocator_pair.max_block_capacity) // most common case
 		{
+			const size_type original_min_block_capacity = min_block_capacity;
 			min_block_capacity = total_size;
 			initialize();
-			min_block_capacity = source.min_block_capacity;
+			min_block_capacity = original_min_block_capacity;
 
 			// Copy groups to this stack:
 			while (current_copy_group != end_copy_group)
@@ -515,8 +562,7 @@ private:
 					}
 
 					const group_pointer_type next_group = first_group->next_group;
-					PLF_DESTROY(group_allocator_type, group_allocator_pair, first_group);
-					PLF_DEALLOCATE(group_allocator_type, group_allocator_pair, first_group, 1);
+					deallocate_group(first_group);
 					first_group = next_group;
 				}
 
@@ -528,9 +574,8 @@ private:
 					PLF_DESTROY(element_allocator_type, *this, element_pointer);
 				}
 
-				first_group = first_group->next_group;
-				PLF_DESTROY(group_allocator_type, group_allocator_pair, current_group);
-				PLF_DEALLOCATE(group_allocator_type, group_allocator_pair, current_group, 1);
+				first_group = first_group->next_group; // To further process reserved groups in the following loop
+				deallocate_group(current_group);
 			}
 		}
 
@@ -540,47 +585,30 @@ private:
 		{
 			current_group = first_group;
 			first_group = first_group->next_group;
-			PLF_DESTROY(group_allocator_type, group_allocator_pair, current_group);
-			PLF_DEALLOCATE(group_allocator_type, group_allocator_pair, current_group, 1);
+			deallocate_group(current_group);
 		}
 	}
 
 
 
-	inline void allocate_new_group(group_pointer_type const current_group, const size_type capacity)
+	inline void blank() PLF_NOEXCEPT
 	{
-		current_group->next_group = PLF_ALLOCATE(group_allocator_type, group_allocator_pair, 1, current_group);
-
-		try
+		#ifdef PLF_TYPE_TRAITS_SUPPORT
+			if PLF_CONSTEXPR (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
+			{
+				std::memset(static_cast<void *>(this), 0, offsetof(stack, min_block_capacity));
+			}
+			else
+		#endif
 		{
-			#ifdef PLF_VARIADICS_SUPPORT
-				PLF_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, capacity, current_group);
-			#else
-				PLF_CONSTRUCT(group_allocator_type, group_allocator_pair, current_group->next_group, group(capacity, current_group));
-			#endif
+			current_group = NULL;
+			first_group = NULL;
+			top_element = NULL;
+			start_element = NULL;
+			end_element = NULL;
+			total_size = 0;
+			total_capacity = 0;
 		}
-		catch (...)
-		{
-			PLF_DEALLOCATE(group_allocator_type, group_allocator_pair, current_group->next_group, 1);
-			current_group->next_group = NULL;
-			throw;
-		}
-
-		total_capacity += capacity;
-	}
-
-
-
-	inline void progress_to_next_group() // used by push/emplace
-	{
-		if (current_group->next_group == NULL) // no reserved groups or groups left over from previous pops, allocate new group
-		{
-			allocate_new_group(current_group, (total_size < group_allocator_pair.max_block_capacity) ? total_size : group_allocator_pair.max_block_capacity);
-		}
-
-		current_group = current_group->next_group;
-		start_element = top_element = current_group->elements;
-		end_element = current_group->end;
 	}
 
 
@@ -693,7 +721,7 @@ public:
 			}
 			catch (...)
 			{
-				if (top_element == start_element && current_group != first_group)
+				if (top_element == start_element && current_group != first_group) // for post-initialize push
 				{
 					current_group = current_group->previous_group;
 					start_element = current_group->elements;
@@ -727,7 +755,6 @@ public:
 			}
 
 
-			// Create element:
 			#ifdef PLF_TYPE_TRAITS_SUPPORT
 				if PLF_CONSTEXPR (std::is_nothrow_move_constructible<element_type>::value)
 				{
@@ -778,7 +805,6 @@ public:
 			}
 
 
-			// Create element:
 			#ifdef PLF_TYPE_TRAITS_SUPPORT
 				if PLF_CONSTEXPR (std::is_nothrow_move_constructible<element_type>::value)
 				{
@@ -822,7 +848,7 @@ public:
 
 
 
-	void pop() // Exception will occur if stack is empty
+	void pop() // Exception may occur if stack is empty
 	{
 		assert(total_size != 0);
 
@@ -834,7 +860,7 @@ public:
 		}
 
 		if ((--total_size != 0) & (top_element-- == start_element))
-		{ // ie. is start element, but not first group in stack (if it were, total_size would be 0 after decrement)
+		{ // ie. is start element, but not first group in stack
 			current_group = current_group->previous_group;
 			start_element = current_group->elements;
 			end_element = current_group->end;
@@ -950,7 +976,7 @@ public:
 private:
 
 	#ifdef PLF_MOVE_SEMANTICS_SUPPORT
-		void move_from_source(stack &source)
+		void move_from_source(stack &source) // This function is a mirror copy of copy_from_source, with move instead of copy
 		{
 			assert(&source != this);
 
@@ -962,13 +988,12 @@ private:
 			group_pointer_type current_copy_group = source.first_group;
 			const group_pointer_type end_copy_group = source.current_group;
 
-			if (total_size <= group_allocator_pair.max_block_capacity) // most common case
+			if (total_size <= group_allocator_pair.max_block_capacity)
 			{
-				min_block_capacity = total_size;
+				min_block_capacity = total_size; // total_size is set to source size in caller
 				initialize();
 				min_block_capacity = source.min_block_capacity;
 
-				// Copy groups to this stack:
 				while (current_copy_group != end_copy_group)
 				{
 					std::uninitialized_copy(std::make_move_iterator(current_copy_group->elements), std::make_move_iterator(current_copy_group->end), top_element);
@@ -976,14 +1001,14 @@ private:
 					current_copy_group = current_copy_group->next_group;
 				}
 
-				// Handle special case of last group:
 				std::uninitialized_copy(std::make_move_iterator(source.start_element), std::make_move_iterator(source.top_element + 1), top_element);
-				top_element += source.top_element - source.start_element; // This should make top_element == the last "pushed" element, rather than the one past it
-				end_element = top_element + 1; // Since we have created a single group where capacity == size, this is correct
+				top_element += source.top_element - source.start_element;
+				end_element = top_element + 1;
 			}
-			else // uncommon edge case, so not optimising:
+			else
 			{
 				min_block_capacity = group_allocator_pair.max_block_capacity;
+				reserve(total_size);
 				total_size = 0;
 
 				while (current_copy_group != end_copy_group)
@@ -996,7 +1021,6 @@ private:
 					current_copy_group = current_copy_group->next_group;
 				}
 
-				// Handle special case of last group:
 				for (element_pointer_type element_to_copy = source.start_element; element_to_copy != source.top_element + 1; ++element_to_copy)
 				{
 					push(std::move(*element_to_copy));
@@ -1045,9 +1069,8 @@ public:
 
 		min_block_capacity = min;
 		group_allocator_pair.max_block_capacity = max;
-		trim();
 
-		// Otherwise need to check all group sizes, because append might append smaller blocks to the end of a larger block:
+		// Need to check all group sizes, because append might append smaller blocks to the end of a larger block:
 		for (group_pointer_type current = first_group; current != NULL; current = current->next_group)
 		{
 			if (static_cast<size_type>(current->end - current->elements) < min || static_cast<size_type>(current->end - current->elements) > max)
@@ -1069,32 +1092,6 @@ public:
 	}
 
 
-
-private:
-
-	inline void blank() PLF_NOEXCEPT
-	{
-		#ifdef PLF_TYPE_TRAITS_SUPPORT
-			if PLF_CONSTEXPR (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
-			{
-				std::memset(static_cast<void *>(this), 0, offsetof(stack, min_block_capacity));
-			}
-			else
-		#endif
-		{
-			current_group = NULL;
-			first_group = NULL;
-			top_element = NULL;
-			start_element = NULL;
-			end_element = NULL;
-			total_size = 0;
-			total_capacity = 0;
-		}
-	}
-
-
-
-public:
 
 	void clear() PLF_NOEXCEPT
 	{
@@ -1173,8 +1170,7 @@ public:
 		{
 			const group_pointer_type next_group = temp_group->next_group;
 			total_capacity -= static_cast<size_type>(temp_group->end - temp_group->elements);
-			PLF_DESTROY(group_allocator_type, group_allocator_pair, temp_group);
-			PLF_DEALLOCATE(group_allocator_type, group_allocator_pair, temp_group, 1);
+			deallocate_group(temp_group);
 			temp_group = next_group;
 		}
 	}
@@ -1220,6 +1216,11 @@ public:
 		size_type number_of_max_capacity_groups = reserve_amount / group_allocator_pair.max_block_capacity,
 					remainder = reserve_amount - (number_of_max_capacity_groups * group_allocator_pair.max_block_capacity);
 
+		if (remainder < min_block_capacity)
+		{
+			remainder = min_block_capacity;
+		}
+
 		if (first_group == NULL) // ie. uninitialized stack
 		{
 			const size_type original_min_elements = min_block_capacity;
@@ -1252,14 +1253,14 @@ public:
 
 		if (remainder != 0)
 		{
-			allocate_new_group(temp_group, remainder);
+			allocate_new_group(remainder, temp_group);
 			temp_group = temp_group->next_group;
 		}
 
 
 		while(number_of_max_capacity_groups != 0)
 		{
-			allocate_new_group(temp_group, group_allocator_pair.max_block_capacity);
+			allocate_new_group(group_allocator_pair.max_block_capacity, temp_group);
 			temp_group = temp_group->next_group;
 			--number_of_max_capacity_groups;
 		}
@@ -1289,6 +1290,7 @@ public:
 				*this = std::move(source);
 			#else
 				destroy_all_data();
+				blank();
 				swap(source);
 			#endif
 
@@ -1473,6 +1475,7 @@ inline void swap (plf::stack<element_type, element_allocator_type> &a, plf::stac
 }
 
 
+#undef PLF_MIN_BLOCK_CAPACITY
 #undef PLF_FORCE_INLINE
 #undef PLF_ALIGNMENT_SUPPORT
 #undef PLF_INITIALIZER_LIST_SUPPORT
