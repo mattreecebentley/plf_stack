@@ -22,7 +22,6 @@
 #define PLF_STACK_H
 
 
-
 // Compiler-specific defines:
 
 #if defined(_MSC_VER)
@@ -182,11 +181,9 @@
 #if defined(PLF_IS_ALWAYS_EQUAL_SUPPORT) && defined(PLF_MOVE_SEMANTICS_SUPPORT) && defined(PLF_ALLOCATOR_TRAITS_SUPPORT) && (__cplusplus >= 201703L || (defined(_MSVC_LANG) && (_MSVC_LANG >= 201703L)))
 	#define PLF_NOEXCEPT_MOVE_ASSIGN(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_move_assignment::value || std::allocator_traits<the_allocator>::is_always_equal::value)
 	#define PLF_NOEXCEPT_SWAP(the_allocator) noexcept(std::allocator_traits<the_allocator>::propagate_on_container_swap::value || std::allocator_traits<the_allocator>::is_always_equal::value)
-	#define PLF_NOEXCEPT_SPLICE(the_allocator) noexcept(std::allocator_traits<the_allocator>::is_always_equal::value)
 #else
 	#define PLF_NOEXCEPT_MOVE_ASSIGN(the_allocator)
 	#define PLF_NOEXCEPT_SWAP(the_allocator)
-	#define PLF_NOEXCEPT_SPLICE(the_allocator)
 #endif
 
 #undef PLF_IS_ALWAYS_EQUAL_SUPPORT
@@ -292,7 +289,7 @@ private:
 
 		#else
 			// This is a hack around the fact that element_allocator_type::construct only supports copy construction in C++03 and copy elision does not occur on the vast majority of compilers in this circumstance. And to avoid running out of memory (and performance loss) from allocating the same block twice, we're allocating in this constructor and moving data in the copy constructor.
-			group(const size_type elements_per_group, group_pointer_type const previous) PLF_NOEXCEPT:
+			group(const size_type elements_per_group, group_pointer_type const previous = NULL) PLF_NOEXCEPT:
 				elements(NULL),
 				next_group(reinterpret_cast<group_pointer_type>(elements_per_group)),
 				previous_group(previous),
@@ -333,7 +330,7 @@ private:
 
 	inline void check_capacities_conformance(const size_type min, const size_type max) const
 	{
-  		if (min < 2 || min > max || max > std::numeric_limits<size_type>::max())
+  		if (min < 2 || min > max || max > (std::numeric_limits<size_type>::max() / 2))
 		{
 			throw std::length_error("Supplied memory block capacities outside of allowable ranges");
 		}
@@ -1275,7 +1272,7 @@ public:
 
 
 
-	void append(stack &source) PLF_NOEXCEPT_SWAP(element_allocator_type)
+	void append(stack &source)
 	{
 		// Process: if there are unused memory spaces at the end of the last current back group of the chain, fill those up
 		// with elements from the source groups, starting from the back. Then link the destination stack's groups to the source stack's groups.
@@ -1294,10 +1291,6 @@ public:
 				swap(source);
 			#endif
 
-			source.current_group = NULL;
-			source.top_element = NULL;
-			source.start_element = NULL;
-			source.end_element = NULL;
 			return;
 		}
 
@@ -1384,6 +1377,19 @@ public:
 		// Trim trailing groups on both, link source and destinations groups and remove references to source groups from source:
 		source.trim();
 		trim();
+
+
+		// Throw if incompatible group capacity found:
+		if (source.min_block_capacity < min_block_capacity || source.group_allocator_pair.max_block_capacity > group_allocator_pair.max_block_capacity)
+		{
+			for (group_pointer_type current = source.first_group; current != NULL; current = current->next_group)
+			{
+				if (static_cast<size_type>(current->end - current->elements) < min_block_capacity || static_cast<size_type>(current->end - current->elements) > group_allocator_pair.max_block_capacity)
+				{
+					throw std::length_error("A source memory block capacity is outside of the destination's minimum or maximum memory block capacity limits - please change either the source or the destination's min/max block capacity limits using reshape() before calling append() in this case");
+				}
+			}
+		}
 
 
 		current_group->next_group = source.first_group;
@@ -1484,7 +1490,6 @@ inline void swap (plf::stack<element_type, element_allocator_type> &a, plf::stac
 #undef PLF_VARIADICS_SUPPORT
 #undef PLF_MOVE_SEMANTICS_SUPPORT
 #undef PLF_NOEXCEPT
-#undef PLF_NOEXCEPT_SPLICE
 #undef PLF_NOEXCEPT_SWAP
 #undef PLF_NOEXCEPT_MOVE_ASSIGN
 #undef PLF_CONSTEXPR
