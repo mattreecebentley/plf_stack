@@ -486,7 +486,7 @@ private:
 	{
 		assert(&source != this);
 
-		if (total_size == 0)
+		if (source.total_size == 0)
 		{
 			return;
 		}
@@ -494,10 +494,10 @@ private:
 		group_pointer_type current_copy_group = source.first_group;
 		const group_pointer_type end_copy_group = source.current_group;
 
-		if (total_size <= group_allocator_pair.max_block_capacity) // most common case
+		if (source.total_size <= group_allocator_pair.max_block_capacity) // most common case
 		{
 			const size_type original_min_block_capacity = min_block_capacity;
-			min_block_capacity = total_size;
+			min_block_capacity = source.total_size;
 			initialize();
 			min_block_capacity = original_min_block_capacity;
 
@@ -513,11 +513,11 @@ private:
 			std::uninitialized_copy(source.start_element, source.top_element + 1, top_element);
 			top_element += source.top_element - source.start_element; // This should make top_element == the last "pushed" element, rather than the one past it
 			end_element = top_element + 1; // Since we have created a single group where capacity == size, this is correct
+			total_size = source.total_size;
 		}
 		else // uncommon edge case, so not optimising:
 		{
 			min_block_capacity = group_allocator_pair.max_block_capacity;
-			total_size = 0;
 
 			while (current_copy_group != end_copy_group)
 			{
@@ -620,8 +620,8 @@ public:
 		top_element(NULL),
 		start_element(NULL),
 		end_element(NULL),
-		total_size(source.total_size),
-		total_capacity(source.total_size),
+		total_size(0),
+		total_capacity(0),
 		min_block_capacity(source.min_block_capacity),
 		group_allocator_pair(source.group_allocator_pair.max_block_capacity)
 	{
@@ -638,8 +638,8 @@ public:
 		top_element(NULL),
 		start_element(NULL),
 		end_element(NULL),
-		total_size(source.total_size),
-		total_capacity(source.total_size),
+		total_size(0),
+		total_capacity(0),
 		min_block_capacity(source.min_block_capacity),
 		group_allocator_pair(source.group_allocator_pair.max_block_capacity)
 	{
@@ -977,7 +977,7 @@ private:
 		{
 			assert(&source != this);
 
-			if (total_size == 0)
+			if (source.total_size == 0)
 			{
 				return;
 			}
@@ -985,9 +985,9 @@ private:
 			group_pointer_type current_copy_group = source.first_group;
 			const group_pointer_type end_copy_group = source.current_group;
 
-			if (total_size <= group_allocator_pair.max_block_capacity)
+			if (source.total_size <= group_allocator_pair.max_block_capacity)
 			{
-				min_block_capacity = total_size; // total_size is set to source size in caller
+				min_block_capacity = source.total_size; // total_size is set to source size in caller
 				initialize();
 				min_block_capacity = source.min_block_capacity;
 
@@ -1001,12 +1001,11 @@ private:
 				std::uninitialized_copy(std::make_move_iterator(source.start_element), std::make_move_iterator(source.top_element + 1), top_element);
 				top_element += source.top_element - source.start_element;
 				end_element = top_element + 1;
+				total_size = source.total_size;
 			}
 			else
 			{
 				min_block_capacity = group_allocator_pair.max_block_capacity;
-				reserve(total_size);
-				total_size = 0;
 
 				while (current_copy_group != end_copy_group)
 				{
@@ -1033,8 +1032,7 @@ private:
 	inline void consolidate()
 	{
 		#ifdef PLF_MOVE_SEMANTICS_SUPPORT
-			stack temp((min_block_capacity > total_size) ? min_block_capacity : ((total_size > group_allocator_pair.max_block_capacity) ? group_allocator_pair.max_block_capacity : total_size), group_allocator_pair.max_block_capacity); // Make first allocated group as large total number of elements, where possible
-			temp.total_size = total_size;
+			stack temp((min_block_capacity > total_size) ? min_block_capacity : ((total_size > group_allocator_pair.max_block_capacity) ? group_allocator_pair.max_block_capacity : total_size), group_allocator_pair.max_block_capacity); // Make first allocated block as large as total_size, where possible
 
 			#ifdef PLF_TYPE_TRAITS_SUPPORT
 				if PLF_CONSTEXPR (std::is_move_assignable<element_type>::value && std::is_move_constructible<element_type>::value)
@@ -1176,7 +1174,7 @@ public:
 
 	void shrink_to_fit()
 	{
-		if (first_group == NULL || total_size == capacity())
+		if (first_group == NULL || total_size == total_capacity)
 		{
 			return;
 		}

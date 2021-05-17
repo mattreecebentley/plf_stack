@@ -148,14 +148,14 @@ int main()
 			title1("Test basics");
 
 			stack<unsigned int> i_stack(50);
-			
+
 			for (unsigned int temp = 0; temp != 250000; ++temp)
 			{
 				i_stack.push(10);
 			}
-			
+
 			failpass("Multipush test", i_stack.size() == 250000);
-			
+
 			stack<unsigned int> i_stack2;
 			i_stack2 = i_stack;
 
@@ -173,18 +173,18 @@ int main()
 
 
 			stack<unsigned int> i_stack7(50, 50);
-			
+
 			for (unsigned int temp = 0; temp != 449; ++temp)
 			{
 				i_stack7.push(10);
 			}
-			
+
 			failpass("Max limit test", i_stack7.capacity() == 450);
-			
+
 			i_stack7.reshape(100, 100);
-			
+
 			failpass("Reshape test", i_stack7.capacity() == 500);
-			
+
 
 			#ifdef PLF_TEST_MOVE_SEMANTICS_SUPPORT
 				stack<unsigned int> i_stack4;
@@ -195,25 +195,25 @@ int main()
 				failpass("Allocator-extended move-construct test", i_stack5.size() == 250000);
 
 				i_stack3 = std::move(i_stack5);
-				
+
 			#else
 				failpass("Equality operator test", i_stack2 == i_stack3);
 			#endif
 
 			failpass("Copy test", i_stack2.size() == 250000);
 			failpass("Equality operator test 2", i_stack == i_stack2);
-			
+
 			i_stack2.push(5);
 			i_stack2.swap(i_stack3);
-			
+
 			failpass("Swap test", i_stack2.size() == i_stack3.size() - 1);
 
 			swap(i_stack2, i_stack3);
-			
+
 			failpass("Swap test 2", i_stack3.size() == i_stack2.size() - 1);
 
 			failpass("max_size() test", i_stack2.max_size() > i_stack2.size());
-			
+
 
 			unsigned int total = 0;
 
@@ -277,6 +277,76 @@ int main()
 		}
 
 
+		{
+ 			title2("stack expansion test");
+
+ 			stack<int> i_stack;
+			int push_total = 0, pop_total = 0;
+
+			for (int counter = 0; counter != 500; ++counter)
+			{
+				i_stack.push(counter);
+				push_total += counter;
+			}
+
+
+ 			do
+ 			{
+				pop_total += i_stack.top();
+				i_stack.pop();
+ 			} while (!i_stack.empty());
+
+
+			failpass("stack expansion test 1", pop_total == push_total);
+
+
+			push_total = 0;
+			pop_total = 0;
+
+
+			for (int counter = 0; counter != 50; ++counter)
+			{
+				i_stack.push(counter);
+				push_total += counter;
+			}
+
+
+ 			do
+ 			{
+ 				if ((plf::rand() & 3) == 0)
+ 				{
+ 					pop_total += i_stack.top();
+					i_stack.pop();
+ 				}
+ 				else
+ 				{
+ 					i_stack.push(10);
+					push_total += 10;
+ 				}
+ 			} while (!i_stack.empty() && i_stack.capacity() < 5000);
+
+
+
+ 			do
+ 			{
+ 				if ((plf::rand() & 3) == 0)
+ 				{
+ 					i_stack.push(10);
+					push_total += 10;
+ 				}
+ 				else
+ 				{
+ 					pop_total += i_stack.top();
+					i_stack.pop();
+ 				}
+ 			} while (!i_stack.empty());
+
+
+ 			failpass("random stack expansion test", pop_total == push_total);
+		}
+
+
+
 		#ifdef PLF_TEST_VARIADICS_SUPPORT
 		{
 			title2("Perfect Forwarding tests");
@@ -296,71 +366,71 @@ int main()
 
 		{
 			title2("append tests");
-			
+
 			{
 				stack<int> stack1, stack2;
-				
+
 				for(int number = 0; number != 20; ++number)
 				{
 					stack1.push(number);
 					stack2.push(number + 20);
 				}
-				
+
 				stack1.append(stack2);
-				
+
 				int check_number = 0;
-				
+
 				while(!stack1.empty())
 				{
 					check_number += stack1.top();
 					stack1.pop();
 				}
-				
+
 				failpass("Small append test 1", check_number == 780);
 			}
-			
+
 
 			{
 				stack<unsigned int> stack1, stack2;
-				
+
 				for(unsigned int number = 0; number != 100000; ++number)
 				{
 					stack1.push(number);
 					stack2.push(number + 100000);
 				}
-				
+
 				stack1.append(stack2);
-				
+
 				unsigned int check_number = 0;
-				
+
 				while(!stack1.empty())
 				{
 					check_number += stack1.top();
 					stack1.pop();
 				}
-				
+
 				failpass("Large append test 1", check_number == 2820030816u);
 			}
-			
+
 
 
 			{
 				stack<int> stack1, stack2;
-				
+
 				for(int number = 150; number != 250; ++number)
 				{
 					stack1.push(number);
 				}
-				
-				
+
+
 				for(int number = 0; number != 150; ++number)
 				{
 					stack2.push(number);
 				}
-				
-			
+
+
 				stack1.append(stack2);
-				
+
 				int check_number = 0;
 
 				while(!stack1.empty())
@@ -369,10 +439,10 @@ int main()
 					stack1.pop();
 				}
 
-				
+
 				failpass("Unequal size append test 1", check_number == 31125);
 			}
-			
+
 		}
 
 	}
