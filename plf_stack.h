@@ -24,7 +24,7 @@
 
 // Compiler-specific defines:
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
 	#define PLF_FORCE_INLINE __forceinline
 
 	#if _MSC_VER >= 1600
