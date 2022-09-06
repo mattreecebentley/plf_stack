@@ -584,7 +584,7 @@ private:
 	void blank() PLF_NOEXCEPT
 	{
 		#ifdef PLF_TYPE_TRAITS_SUPPORT
-			if PLF_CONSTEXPR (std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
+			if PLF_CONSTEXPR (std::is_standard_layout<stack>::value && std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
 			{
 				std::memset(static_cast<void *>(this), 0, offsetof(stack, min_block_capacity));
 			}
@@ -896,7 +896,9 @@ public:
 			#endif
 			{
 				#if defined(PLF_TYPE_TRAITS_SUPPORT) && defined(PLF_ALLOCATOR_TRAITS_SUPPORT)
-					if PLF_CONSTEXPR ((std::is_trivially_copyable<allocator_type>::value || std::allocator_traits<allocator_type>::is_always_equal::value) &&
+std::is_standard_layout<stack>::value && std::allocator_traits<allocator_type>::is_always_equal::value &&
+
+					if PLF_CONSTEXPR (std::is_standard_layout<stack>::value && (std::is_trivially_copyable<allocator_type>::value || std::allocator_traits<allocator_type>::is_always_equal::value) &&
 						std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value)
 					{
 						std::memcpy(static_cast<void *>(this), &source, sizeof(stack));
@@ -1286,6 +1288,14 @@ public:
 
 
 
+	#ifdef PLF_CPP20_SUPPORT
+		#define PLF_TO_ADDRESS(pointer) std::to_address(pointer)
+	#else
+		#define PLF_TO_ADDRESS(pointer) &*(pointer)
+	#endif
+
+
+
 	void append(stack &source)
 	{
 		// Process: if there are unused memory spaces at the end of the last current back group of the chain, fill those up
@@ -1321,7 +1331,7 @@ public:
 			#ifdef PLF_TYPE_TRAITS_SUPPORT
 				if PLF_CONSTEXPR (std::is_trivially_copyable<element_type>::value && std::is_trivially_destructible<element_type>::value)
 				{
-					std::memcpy(static_cast<void *>(&*top_element), static_cast<void *>(&*source.start_element), current_source_group_size * sizeof(element_type));
+					std::memcpy(static_cast<void *>(PLF_TO_ADDRESS(top_element)), static_cast<void *>(PLF_TO_ADDRESS(source.start_element)), current_source_group_size * sizeof(element_type));
 				}
 				#ifdef PLF_MOVE_SEMANTICS_SUPPORT
 					else if PLF_CONSTEXPR (std::is_move_constructible<element_type>::value)
@@ -1365,7 +1375,7 @@ public:
 			#ifdef PLF_TYPE_TRAITS_SUPPORT
 				if PLF_CONSTEXPR (std::is_trivially_copyable<element_type>::value && std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible iterators ie. all iterators, unless allocator returns non-trivial pointers
 				{
-					std::memcpy(static_cast<void *>(&*top_element), static_cast<void *>(&*start), elements_to_be_transferred * sizeof(element_type));
+					std::memcpy(static_cast<void *>(PLF_TO_ADDRESS(top_element)), static_cast<void *>(PLF_TO_ADDRESS(start)), elements_to_be_transferred * sizeof(element_type));
 				}
 				#ifdef PLF_MOVE_SEMANTICS_SUPPORT
 					else if PLF_CONSTEXPR (std::is_move_constructible<element_type>::value)
@@ -1514,6 +1524,7 @@ void swap (plf::stack<element_type, allocator_type> &a, plf::stack<element_type,
 
 
 #undef PLF_MIN_BLOCK_CAPACITY
+#undef PLF_TO_ADDRESS
 
 #undef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 #undef PLF_ALIGNMENT_SUPPORT
