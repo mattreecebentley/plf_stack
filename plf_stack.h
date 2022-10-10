@@ -896,10 +896,7 @@ public:
 			#endif
 			{
 				#if defined(PLF_TYPE_TRAITS_SUPPORT) && defined(PLF_ALLOCATOR_TRAITS_SUPPORT)
-std::is_standard_layout<stack>::value && std::allocator_traits<allocator_type>::is_always_equal::value &&
-
-					if PLF_CONSTEXPR (std::is_standard_layout<stack>::value && (std::is_trivially_copyable<allocator_type>::value || std::allocator_traits<allocator_type>::is_always_equal::value) &&
-						std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value)
+					if PLF_CONSTEXPR (std::is_standard_layout<stack>::value && (std::is_trivially_copyable<allocator_type>::value || std::allocator_traits<allocator_type>::is_always_equal::value) && std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value)
 					{
 						std::memcpy(static_cast<void *>(this), &source, sizeof(stack));
 					}
