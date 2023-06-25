@@ -232,9 +232,97 @@
 
 
 
+#ifdef PLF_CPP20_SUPPORT
+	#include <compare> // std::to_address
+#endif
+
 
 namespace plf
 {
+	// std:: tool replacements for C++03/98/11 support:
+
+#ifndef PLF_TOOLS
+	#define PLF_TOOLS
+
+	template <bool condition, class T = void>
+	struct enable_if
+	{
+		typedef T type;
+	};
+
+	template <class T>
+	struct enable_if<false, T>
+	{};
+
+
+
+	template <bool flag, class is_true, class is_false> struct conditional;
+
+	template <class is_true, class is_false> struct conditional<true, is_true, is_false>
+	{
+		typedef is_true type;
+	};
+
+	template <class is_true, class is_false> struct conditional<false, is_true, is_false>
+	{
+		typedef is_false type;
+	};
+
+
+
+	template <class element_type>
+	struct less
+	{
+		bool operator() (const element_type &a, const element_type &b) const PLF_NOEXCEPT
+		{
+			return a < b;
+		}
+	};
+
+
+
+	template<class element_type>
+	struct equal_to
+	{
+		const element_type value;
+
+		explicit equal_to(const element_type store_value): // no noexcept as element may allocate and potentially throw when copied
+			value(store_value)
+		{}
+
+		bool operator() (const element_type compare_value) const PLF_NOEXCEPT
+		{
+			return value == compare_value;
+		}
+	};
+	
+
+
+	// To enable conversion to void * when allocator supplies non-raw pointers:
+	template <class source_pointer_type>
+	static PLF_CONSTFUNC void * void_cast(const source_pointer_type source_pointer) PLF_NOEXCEPT
+	{
+		#if defined(PLF_CPP20_SUPPORT)
+			return static_cast<void *>(std::to_address(source_pointer));
+		#else
+			return static_cast<void *>(&*source_pointer);
+		#endif
+	}
+
+
+
+	#ifdef PLF_MOVE_SEMANTICS_SUPPORT
+		template <class iterator_type>
+		PLF_CONSTFUNC std::move_iterator<iterator_type> make_move_iterator(iterator_type it)
+		{
+			return std::move_iterator<iterator_type>(std::move(it));
+		}
+	#endif
+#endif
+
+
+
+
 
 template <class element_type, class allocator_type = std::allocator<element_type> > class stack : private allocator_type // Empty base class optimisation - inheriting allocator functions
 {
@@ -287,7 +375,7 @@ private:
 
 
 		#else
-			// This is a hack around the fact that allocator_type::construct only supports copy construction in C++03 and copy elision does not occur on the vast majority of compilers in this circumstance. And to avoid running out of memory (and performance loss) from allocating the same block twice, we're allocating in this constructor and moving data in the copy constructor.
+			// This is a hack around the fact that allocator_type::construct only supports copy construction in C++03 and copy elision does not occur on the vast majority of compilers in this circumstance. And to avoid running out of memory (and performance loss) from allocating the same block twice, we're allocating in the copy constructor.
 			group(const size_type elements_per_group, group_pointer_type const previous = NULL) PLF_NOEXCEPT:
 				elements(NULL),
 				next_group(reinterpret_cast<group_pointer_type>(elements_per_group)),
@@ -1049,12 +1137,12 @@ private:
 
 				while (current_copy_group != end_copy_group)
 				{
-					std::uninitialized_copy(std::make_move_iterator(current_copy_group->elements), std::make_move_iterator(current_copy_group->end), top_element);
+					std::uninitialized_copy(plf::make_move_iterator(current_copy_group->elements), plf::make_move_iterator(current_copy_group->end), top_element);
 					top_element += current_copy_group->end - current_copy_group->elements;
 					current_copy_group = current_copy_group->next_group;
 				}
 
-				std::uninitialized_copy(std::make_move_iterator(source.start_element), std::make_move_iterator(source.top_element + 1), top_element);
+				std::uninitialized_copy(plf::make_move_iterator(source.start_element), plf::make_move_iterator(source.top_element + 1), top_element);
 				top_element += source.top_element - source.start_element;
 				end_element = top_element + 1;
 				total_size = source.total_size;
@@ -1330,14 +1418,6 @@ public:
 
 
 
-	#ifdef PLF_CPP20_SUPPORT
-		#define PLF_TO_ADDRESS(pointer) std::to_address(pointer)
-	#else
-		#define PLF_TO_ADDRESS(pointer) &*(pointer)
-	#endif
-
-
-
 	void append(stack &source)
 	{
 		// Process: if there are unused memory spaces at the end of the last current back group of the chain, fill those up
@@ -1373,12 +1453,12 @@ public:
 			#ifdef PLF_TYPE_TRAITS_SUPPORT
 				if PLF_CONSTEXPR (std::is_trivially_copyable<element_type>::value && std::is_trivially_destructible<element_type>::value)
 				{
-					std::memcpy(static_cast<void *>(PLF_TO_ADDRESS(top_element)), static_cast<void *>(PLF_TO_ADDRESS(source.start_element)), current_source_group_size * sizeof(element_type));
+					std::memcpy(plf::void_cast(top_element), plf::void_cast(source.start_element), current_source_group_size * sizeof(element_type));
 				}
 				#ifdef PLF_MOVE_SEMANTICS_SUPPORT
 					else if PLF_CONSTEXPR (std::is_move_constructible<element_type>::value)
 					{
-						std::uninitialized_copy(std::make_move_iterator(source.start_element), std::make_move_iterator(source.top_element + 1), top_element);
+						std::uninitialized_copy(plf::make_move_iterator(source.start_element), plf::make_move_iterator(source.top_element + 1), top_element);
 					}
 				#endif
 				else
@@ -1417,12 +1497,12 @@ public:
 			#ifdef PLF_TYPE_TRAITS_SUPPORT
 				if PLF_CONSTEXPR (std::is_trivially_copyable<element_type>::value && std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible iterators ie. all iterators, unless allocator returns non-trivial pointers
 				{
-					std::memcpy(static_cast<void *>(PLF_TO_ADDRESS(top_element)), static_cast<void *>(PLF_TO_ADDRESS(start)), elements_to_be_transferred * sizeof(element_type));
+					std::memcpy(plf::void_cast(top_element), plf::void_cast(start), elements_to_be_transferred * sizeof(element_type));
 				}
 				#ifdef PLF_MOVE_SEMANTICS_SUPPORT
 					else if PLF_CONSTEXPR (std::is_move_constructible<element_type>::value)
 					{
-						std::uninitialized_copy(std::make_move_iterator(start), std::make_move_iterator(source.top_element + 1), top_element);
+						std::uninitialized_copy(plf::make_move_iterator(start), plf::make_move_iterator(source.top_element + 1), top_element);
 					}
 				#endif
 				else
@@ -1570,7 +1650,6 @@ void swap (plf::stack<element_type, allocator_type> &a, plf::stack<element_type,
 
 
 #undef PLF_MIN_BLOCK_CAPACITY
-#undef PLF_TO_ADDRESS
 
 #undef PLF_EXCEPTIONS_SUPPORT
 #undef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
