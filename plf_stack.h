@@ -38,6 +38,10 @@
 #endif
 
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
+    // Suppress incorrect (unfixed MSVC bug) warnings re: constant expressions in constexpr-if statements
+	#pragma warning ( push )
+    #pragma warning ( disable : 4127 )
+
 	#if _MSC_VER >= 1600
 		#define PLF_MOVE_SEMANTICS_SUPPORT
 	#endif
@@ -302,7 +306,7 @@ namespace plf
 	template <class source_pointer_type>
 	static PLF_CONSTFUNC void * void_cast(const source_pointer_type source_pointer) PLF_NOEXCEPT
 	{
-		#if defined(PLF_CPP20_SUPPORT)
+		#ifdef PLF_CPP20_SUPPORT
 			return static_cast<void *>(std::to_address(source_pointer));
 		#else
 			return static_cast<void *>(&*source_pointer);
@@ -372,8 +376,6 @@ private:
 				previous_group(previous),
 				end(elements + elements_per_group)
 			{}
-
-
 		#else
 			// This is a hack around the fact that allocator_type::construct only supports copy construction in C++03 and copy elision does not occur on the vast majority of compilers in this circumstance. And to avoid running out of memory (and performance loss) from allocating the same block twice, we're allocating in the copy constructor.
 			group(const size_type elements_per_group, group_pointer_type const previous = NULL) PLF_NOEXCEPT:
@@ -1671,5 +1673,9 @@ void swap (plf::stack<element_type, allocator_type> &a, plf::stack<element_type,
 #undef PLF_DESTROY
 #undef PLF_ALLOCATE
 #undef PLF_DEALLOCATE
+
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
+	#pragma warning ( pop )
+#endif
 
 #endif // PLF_STACK_H
