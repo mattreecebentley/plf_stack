@@ -322,6 +322,10 @@ namespace plf
 			return std::move_iterator<iterator_type>(std::move(it));
 		}
 	#endif
+
+
+
+	enum priority { performance = 1, memory_use = 4};
 #endif
 
 
@@ -332,19 +336,19 @@ template <class element_type, class allocator_type = std::allocator<element_type
 {
 public:
 	// Standard container typedefs:
-	typedef element_type																		value_type;
+	typedef element_type														value_type;
 
 	#ifdef PLF_ALLOCATOR_TRAITS_SUPPORT
-		typedef typename std::allocator_traits<allocator_type>::size_type			size_type;
-		typedef element_type &																	reference;
-		typedef const element_type &															const_reference;
-		typedef typename std::allocator_traits<allocator_type>::pointer 			pointer;
+		typedef typename std::allocator_traits<allocator_type>::size_type		size_type;
+		typedef element_type &													reference;
+		typedef const element_type &											const_reference;
+		typedef typename std::allocator_traits<allocator_type>::pointer 		pointer;
 		typedef typename std::allocator_traits<allocator_type>::const_pointer	const_pointer;
 	#else
 		typedef typename allocator_type::size_type			size_type;
 		typedef typename allocator_type::reference			reference;
 		typedef typename allocator_type::const_reference	const_reference;
-		typedef typename allocator_type::pointer				pointer;
+		typedef typename allocator_type::pointer			pointer;
 		typedef typename allocator_type::const_pointer		const_pointer;
 	#endif
 
@@ -353,12 +357,12 @@ private:
 
 	#ifdef PLF_ALLOCATOR_TRAITS_SUPPORT
 		typedef typename std::allocator_traits<allocator_type>::template rebind_alloc<group> group_allocator_type;
-		typedef typename std::allocator_traits<group_allocator_type>::pointer					group_pointer_type;
-		typedef typename std::allocator_traits<allocator_type>::pointer 							element_pointer_type;
+		typedef typename std::allocator_traits<group_allocator_type>::pointer				group_pointer_type;
+		typedef typename std::allocator_traits<allocator_type>::pointer 					element_pointer_type;
 	#else
 		typedef typename allocator_type::template rebind<group>::other	group_allocator_type;
-		typedef typename group_allocator_type::pointer						group_pointer_type;
-		typedef typename allocator_type::pointer								element_pointer_type;
+		typedef typename group_allocator_type::pointer					group_pointer_type;
+		typedef typename allocator_type::pointer						element_pointer_type;
 	#endif
 
 
@@ -407,8 +411,8 @@ private:
 
 
 	group_pointer_type		current_group, first_group; // current group is location of top pointer, first_group is 'front' group, saves performance for ~stack etc
-	element_pointer_type		top_element, start_element, end_element; // start_element/end_element cache current_group->end/elements for better performance
-	size_type					total_size, total_capacity, min_block_capacity;
+	element_pointer_type	top_element, start_element, end_element; // start_element/end_element cache current_group->end/elements for better performance
+	size_type				total_size, total_capacity, min_block_capacity;
 	struct ebco_pair : group_allocator_type // Packaging the group allocator with the least-used member variable, for empty-base-class optimization
 	{
 		size_type max_block_capacity;
@@ -422,7 +426,7 @@ private:
 
 	void check_capacities_conformance(const size_type min, const size_type max) const
 	{
-  		if (min < 2 || min > max || max > (std::numeric_limits<size_type>::max() / 2))
+  		if (min < 2 || min > max || max > (default_max_block_capacity()))
 		{
 			#ifdef PLF_EXCEPTIONS_SUPPORT
 				throw std::length_error("Supplied memory block capacities outside of allowable ranges");
@@ -433,10 +437,23 @@ private:
 	}
 
 
-	#define PLF_MIN_BLOCK_CAPACITY (sizeof(element_type) * 8 > (sizeof(*this) + sizeof(group)) * 2) ? 8 : (((sizeof(*this) + sizeof(group)) * 2) / sizeof(element_type)) + 1
-
 
 public:
+
+
+	static PLF_CONSTFUNC size_type default_min_block_capacity() PLF_NOEXCEPT
+	{
+		return (sizeof(element_type) * 8 > (sizeof(stack) + sizeof(group)) * 2) ? 8 : (((sizeof(stack) + sizeof(group)) * 2) / sizeof(element_type)) + 1;
+	}
+	
+	
+
+	static PLF_CONSTFUNC size_type default_max_block_capacity() PLF_NOEXCEPT
+	{
+		return std::numeric_limits<size_type>::max() / 2;
+	}
+	
+	
 
 	// Default constructor:
 	PLF_CONSTFUNC stack() PLF_NOEXCEPT_ALLOCATOR:
@@ -447,9 +464,10 @@ public:
 		end_element(NULL),
 		total_size(0),
 		total_capacity(0),
-		min_block_capacity(PLF_MIN_BLOCK_CAPACITY),
-		group_allocator_pair(std::numeric_limits<size_type>::max() / 2, *this)
+		min_block_capacity(default_min_block_capacity()),
+		group_allocator_pair(default_max_block_capacity(), *this)
 	{}
+	
 
 
 	// Allocator-extended constructor:
@@ -462,14 +480,14 @@ public:
 		end_element(NULL),
 		total_size(0),
 		total_capacity(0),
-		min_block_capacity(PLF_MIN_BLOCK_CAPACITY),
-		group_allocator_pair(std::numeric_limits<size_type>::max() / 2, alloc)
+		min_block_capacity(default_min_block_capacity()),
+		group_allocator_pair(default_max_block_capacity(), alloc)
 	{}
 
 
 
 	// Constructor with minimum & maximum group size parameters:
-	stack(const size_type min, const size_type max = (std::numeric_limits<size_type>::max() / 2)):
+	stack(const size_type min, const size_type max = default_max_block_capacity()):
 		current_group(NULL),
 		first_group(NULL),
 		top_element(NULL),
@@ -818,15 +836,15 @@ public:
 		}
 
 		// Create element:
-		#ifdef PLF_TYPE_TRAITS_SUPPORT
-			if PLF_CONSTEXPR (std::is_nothrow_copy_constructible<element_type>::value)
+		#ifdef PLF_EXCEPTIONS_SUPPORT
+			#if defined(PLF_TYPE_TRAITS_SUPPORT)
+				if PLF_CONSTEXPR (std::is_nothrow_copy_constructible<element_type>::value)
+				{
+					PLF_CONSTRUCT(allocator_type, *this, top_element, element);
+				}
+				else
+			#endif
 			{
-				PLF_CONSTRUCT(allocator_type, *this, top_element, element);
-			}
-			else
-		#endif
-		{
-			#ifdef PLF_EXCEPTIONS_SUPPORT
 				try
 				{
 					PLF_CONSTRUCT(allocator_type, *this, top_element, element);
@@ -846,10 +864,10 @@ public:
 
 					throw;
 				}
-			#else
-				PLF_CONSTRUCT(allocator_type, *this, top_element, element);
-			#endif
-		}
+			}
+		#else
+			PLF_CONSTRUCT(allocator_type, *this, top_element, element);
+		#endif
 
 		++total_size;
 	}
@@ -870,15 +888,15 @@ public:
 			}
 
 
-			#ifdef PLF_TYPE_TRAITS_SUPPORT
-				if PLF_CONSTEXPR (std::is_nothrow_move_constructible<element_type>::value)
+			#ifdef PLF_EXCEPTIONS_SUPPORT
+				#if defined(PLF_TYPE_TRAITS_SUPPORT)
+					if PLF_CONSTEXPR (std::is_nothrow_move_constructible<element_type>::value)
+					{
+						PLF_CONSTRUCT(allocator_type, *this, top_element, std::move(element));
+					}
+					else
+				#endif
 				{
-					PLF_CONSTRUCT(allocator_type, *this, top_element, std::move(element));
-				}
-				else
-			#endif
-			{
-				#ifdef PLF_EXCEPTIONS_SUPPORT
 					try
 					{
 						PLF_CONSTRUCT(allocator_type, *this, top_element, std::move(element));
@@ -898,10 +916,10 @@ public:
 
 						throw;
 					}
-				#else
-					PLF_CONSTRUCT(allocator_type, *this, top_element, std::move(element));
-				#endif
-			}
+				}
+			#else
+				PLF_CONSTRUCT(allocator_type, *this, top_element, std::move(element));
+			#endif
 
 			++total_size;
 		}
@@ -924,15 +942,15 @@ public:
 			}
 
 
-			#ifdef PLF_TYPE_TRAITS_SUPPORT
-				if PLF_CONSTEXPR (std::is_nothrow_move_constructible<element_type>::value)
+			#ifdef PLF_EXCEPTIONS_SUPPORT
+				#if defined(PLF_TYPE_TRAITS_SUPPORT)
+					if PLF_CONSTEXPR (std::is_nothrow_constructible<element_type>::value)
+					{
+						PLF_CONSTRUCT(allocator_type, *this, top_element, std::forward<arguments>(parameters)...);
+					}
+					else
+				#endif
 				{
-					PLF_CONSTRUCT(allocator_type, *this, top_element, std::forward<arguments>(parameters)...);
-				}
-				else
-			#endif
-			{
-				#ifdef PLF_EXCEPTIONS_SUPPORT
 					try
 					{
 						PLF_CONSTRUCT(allocator_type, *this, top_element, std::forward<arguments>(parameters)...);
@@ -952,10 +970,10 @@ public:
 
 						throw;
 					}
-				#else
-					PLF_CONSTRUCT(allocator_type, *this, top_element, std::forward<arguments>(parameters)...);
-				#endif
-			}
+				}
+			#else
+				PLF_CONSTRUCT(allocator_type, *this, top_element, std::forward<arguments>(parameters)...);
+			#endif
 
 			++total_size;
 		}
@@ -1634,7 +1652,572 @@ public:
 	}
 
 
+	// Iterators:
+
+	// Iterator forward declarations:
+	template <bool is_const> class			stack_iterator;
+	typedef stack_iterator<false>			iterator;
+	typedef stack_iterator<true> 			const_iterator;
+	friend class stack_iterator<false>;
+	friend class stack_iterator<true>;
+
+	template <bool is_const_r> class		stack_reverse_iterator;
+	typedef stack_reverse_iterator<false>	reverse_iterator;
+	typedef stack_reverse_iterator<true>	const_reverse_iterator;
+	friend class stack_reverse_iterator<false>;
+	friend class stack_reverse_iterator<true>;
+
+
+	
+	iterator begin() PLF_NOEXCEPT
+	{
+		return iterator(first_group, first_group->elements);
+	}
+
+
+
+	const_iterator begin() const PLF_NOEXCEPT
+	{
+		return const_iterator(first_group, first_group->elements);
+	}
+
+
+
+	iterator end() PLF_NOEXCEPT
+	{
+		return iterator(current_group, top_element + 1);
+	}
+
+
+
+	const_iterator end() const PLF_NOEXCEPT
+	{
+		return const_iterator(current_group, top_element + 1);
+	}
+
+
+
+	const_iterator cbegin() const PLF_NOEXCEPT
+	{
+		return const_iterator(first_group, first_group->elements);
+	}
+
+
+
+	const_iterator cend() const PLF_NOEXCEPT
+	{
+		return const_iterator(current_group, top_element + 1);
+	}
+
+
+
+	reverse_iterator rbegin() PLF_NOEXCEPT
+	{
+		return reverse_iterator(current_group, top_element);
+	}
+
+
+
+	const_reverse_iterator rbegin() const PLF_NOEXCEPT
+	{
+		return const_reverse_iterator(current_group, top_element);
+	}
+
+
+
+	reverse_iterator rend() PLF_NOEXCEPT
+	{
+		return reverse_iterator(first_group, first_group->elements - 1);
+	}
+
+
+
+	const_reverse_iterator rend() const PLF_NOEXCEPT
+	{
+		return const_reverse_iterator(first_group, first_group->elements - 1);
+	}
+
+
+
+	const_reverse_iterator crbegin() const PLF_NOEXCEPT
+	{
+		return const_reverse_iterator(current_group, top_element);
+	}
+
+
+
+	const_reverse_iterator crend() const PLF_NOEXCEPT
+	{
+		return const_reverse_iterator(first_group, first_group->elements - 1);
+	}
+
+
+
+	template <bool is_const>
+	class stack_iterator
+	{
+	private:
+		typedef typename stack::group_pointer_type 		group_pointer_type;
+		typedef typename stack::pointer				 	pointer_type;
+
+		group_pointer_type		group_pointer;
+		pointer_type 			element_pointer;
+
+	public:
+		struct stack_iterator_tag {};
+		typedef std::bidirectional_iterator_tag	iterator_category;
+		typedef std::bidirectional_iterator_tag	iterator_concept;
+		typedef typename stack::value_type 			value_type;
+		typedef typename stack::difference_type		difference_type;
+		typedef stack_reverse_iterator<is_const> 	reverse_type;
+		typedef typename plf::conditional<is_const, typename stack::const_pointer, typename stack::pointer>::type		pointer;
+		typedef typename plf::conditional<is_const, typename stack::const_reference, typename stack::reference>::type	reference;
+
+		friend class stack;
+		friend class stack_reverse_iterator<false>;
+		friend class stack_reverse_iterator<true>;
+
+
+		stack_iterator() PLF_NOEXCEPT:
+			group_pointer(NULL),
+			element_pointer(NULL)
+		{}
+
+
+
+		stack_iterator (const stack_iterator &source) PLF_NOEXCEPT:
+			group_pointer(source.group_pointer),
+			element_pointer(source.element_pointer)
+		{}
+
+
+
+		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
+			template <bool is_const_it = is_const, class = typename plf::enable_if<is_const_it>::type >
+			stack_iterator(const stack_iterator<false> &source) PLF_NOEXCEPT:
+		#else
+			stack_iterator(const stack_iterator<!is_const> &source) PLF_NOEXCEPT:
+		#endif
+			group_pointer(source.group_pointer),
+			element_pointer(source.element_pointer)
+		{}
+
+
+
+		#ifdef PLF_MOVE_SEMANTICS_SUPPORT
+			stack_iterator(stack_iterator &&source) PLF_NOEXCEPT:
+				group_pointer(std::move(source.group_pointer)),
+				element_pointer(std::move(source.element_pointer))
+			{}
+
+
+
+			#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
+				template <bool is_const_it = is_const, class = typename plf::enable_if<is_const_it>::type >
+				stack_iterator(stack_iterator<false> &&source) PLF_NOEXCEPT:
+			#else
+				stack_iterator(const stack_iterator<!is_const> &&source) PLF_NOEXCEPT:
+			#endif
+				group_pointer(std::move(source.group_pointer)),
+				element_pointer(std::move(source.element_pointer))
+			{}
+		#endif
+
+
+
+		stack_iterator & operator = (const stack_iterator &source) PLF_NOEXCEPT
+		{
+			group_pointer = source.group_pointer;
+			element_pointer = source.element_pointer;
+			return *this;
+		}
+
+
+
+		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
+			template <bool is_const_it = is_const, class = typename plf::enable_if<is_const_it>::type >
+			stack_iterator & operator = (const stack_iterator<false> &source) PLF_NOEXCEPT
+		#else
+			stack_iterator & operator = (const stack_iterator<!is_const> &source) PLF_NOEXCEPT
+		#endif
+		{
+			group_pointer = source.group_pointer;
+			element_pointer = source.element_pointer;
+			return *this;
+		}
+
+
+
+		#ifdef PLF_MOVE_SEMANTICS_SUPPORT
+			stack_iterator & operator = (stack_iterator &&source) PLF_NOEXCEPT
+			{
+				assert(&source != this);
+				group_pointer = std::move(source.group_pointer);
+				element_pointer = std::move(source.element_pointer);
+				return *this;
+			}
+
+
+
+			#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
+				template <bool is_const_it = is_const, class = typename plf::enable_if<is_const_it>::type >
+				stack_iterator & operator = (const stack_iterator<false> &&source) PLF_NOEXCEPT
+			#else
+				stack_iterator & operator = (const stack_iterator<!is_const> &&source) PLF_NOEXCEPT
+			#endif
+			{
+				group_pointer = std::move(source.group_pointer);
+				element_pointer = std::move(source.element_pointer);
+				return *this;
+			}
+		#endif
+
+
+
+		bool operator == (const stack_iterator &rh) const PLF_NOEXCEPT
+		{
+			return (element_pointer == rh.element_pointer);
+		}
+
+
+
+		bool operator == (const stack_iterator<!is_const> &rh) const PLF_NOEXCEPT
+		{
+			return (element_pointer == rh.element_pointer);
+		}
+
+
+
+		bool operator != (const stack_iterator &rh) const PLF_NOEXCEPT
+		{
+			return (element_pointer != rh.element_pointer);
+		}
+
+
+
+		bool operator != (const stack_iterator<!is_const> &rh) const PLF_NOEXCEPT
+		{
+			return (element_pointer != rh.element_pointer);
+		}
+
+
+
+		reference operator * () const // may cause exception with uninitialized iterator
+		{
+			return *element_pointer;
+		}
+
+
+
+		pointer operator -> () const
+		{
+			return element_pointer;
+		}
+
+
+
+		stack_iterator & operator ++ ()
+		{
+			assert(group_pointer != NULL); // covers uninitialised stack_iterator
+
+			if (++element_pointer == group_pointer->end && group_pointer->next_group != NULL)
+			{
+				group_pointer = group_pointer->next_group;
+				element_pointer = group_pointer->elements;
+			}
+
+			return *this;
+		}
+
+
+
+		stack_iterator operator ++(int)
+		{
+			const stack_iterator copy(*this);
+			++*this;
+			return copy;
+		}
+
+
+
+		stack_iterator & operator -- ()
+		{
+			assert(group_pointer != NULL);
+
+			if (element_pointer == group_pointer->elements && group_pointer->previous_group != NULL)
+			{
+				group_pointer = group_pointer->previous_group;
+				element_pointer = group_pointer->end;
+			}
+
+			--element_pointer;
+			return *this;
+		}
+
+
+
+		stack_iterator operator -- (int)
+		{
+			const stack_iterator copy(*this);
+			--*this;
+			return copy;
+		}
+
+
+
+	private:
+		// Used by cend(), erase() etc:
+		stack_iterator(const group_pointer_type group_p, const pointer_type element_p) PLF_NOEXCEPT:
+			group_pointer(group_p),
+			element_pointer(element_p)
+		{}
+
+
+	}; // stack_iterator
+
+
+
+
+	template <bool is_const_r>
+	class stack_reverse_iterator
+	{
+	private:
+		typedef typename stack::group_pointer_type 		group_pointer_type;
+		typedef typename stack::pointer				 	pointer_type;
+
+	protected:
+		iterator current;
+
+	public:
+		struct stack_iterator_tag {};
+		typedef std::bidirectional_iterator_tag 	iterator_category;
+		typedef std::bidirectional_iterator_tag 	iterator_concept;
+		typedef iterator 							iterator_type;
+		typedef typename stack::value_type 		value_type;
+		typedef typename stack::difference_type	difference_type;
+		typedef typename plf::conditional<is_const_r, typename stack::const_pointer, typename stack::pointer>::type		pointer;
+		typedef typename plf::conditional<is_const_r, typename stack::const_reference, typename stack::reference>::type	reference;
+
+		friend class stack;
+
+
+		stack_reverse_iterator () PLF_NOEXCEPT
+		{}
+
+
+
+		stack_reverse_iterator (const stack_reverse_iterator &source) PLF_NOEXCEPT:
+			current(source.current)
+		{}
+
+
+		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
+			template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
+			stack_reverse_iterator (const stack_reverse_iterator<false> &source) PLF_NOEXCEPT:
+		#else
+			stack_reverse_iterator (const stack_reverse_iterator<!is_const_r> &source) PLF_NOEXCEPT:
+		#endif
+			current(source.current)
+		{}
+
+
+		stack_reverse_iterator (const stack_iterator<is_const_r> &source) PLF_NOEXCEPT:
+			current(source)
+		{
+			++(*this);
+		}
+
+
+		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
+			template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
+			stack_reverse_iterator (const stack_iterator<false> &source) PLF_NOEXCEPT:
+		#else
+			stack_reverse_iterator (const stack_iterator<!is_const_r> &source) PLF_NOEXCEPT:
+		#endif
+			current(source)
+		{
+			++(*this);
+		}
+
+
+		#ifdef PLF_MOVE_SEMANTICS_SUPPORT
+			stack_reverse_iterator (stack_reverse_iterator &&source) PLF_NOEXCEPT:
+				current(std::move(source.current))
+			{}
+
+
+			#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
+				template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
+				stack_reverse_iterator (stack_reverse_iterator<false> &&source) PLF_NOEXCEPT:
+			#else
+				stack_reverse_iterator (const stack_iterator<!is_const_r> &&source) PLF_NOEXCEPT:
+			#endif
+				current(std::move(source.current))
+			{}
+		#endif
+
+
+		stack_reverse_iterator& operator = (const stack_iterator<is_const_r> &source) PLF_NOEXCEPT
+		{
+			current = source;
+			++current;
+			return *this;
+		}
+
+
+		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
+			template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
+			stack_reverse_iterator& operator = (const stack_iterator<false> &source) PLF_NOEXCEPT
+		#else
+			stack_reverse_iterator& operator = (const stack_iterator<!is_const_r> &source) PLF_NOEXCEPT
+		#endif
+		{
+			current = source;
+			++current;
+			return *this;
+		}
+
+
+		stack_reverse_iterator& operator = (const stack_reverse_iterator &source) PLF_NOEXCEPT
+		{
+			current = source.current;
+			return *this;
+		}
+
+
+		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
+			template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
+			stack_reverse_iterator& operator = (const stack_reverse_iterator<false> &source) PLF_NOEXCEPT
+		#else
+			stack_reverse_iterator& operator = (const stack_reverse_iterator<!is_const_r> &source) PLF_NOEXCEPT
+		#endif
+		{
+			current = source.current;
+			return *this;
+		}
+
+
+		#ifdef PLF_MOVE_SEMANTICS_SUPPORT
+			stack_reverse_iterator& operator = (stack_reverse_iterator &&source) PLF_NOEXCEPT
+			{
+				assert(&source != this);
+				current = std::move(source.current);
+				return *this;
+			}
+
+
+			#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
+				template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
+				stack_reverse_iterator& operator = (stack_reverse_iterator<false> &&source) PLF_NOEXCEPT
+			#else
+				stack_reverse_iterator& operator = (stack_reverse_iterator<!is_const_r> &&source) PLF_NOEXCEPT
+			#endif
+			{
+				assert(&source != this);
+				current = std::move(source.current);
+				return *this;
+			}
+		#endif
+
+
+
+		bool operator == (const stack_reverse_iterator &rh) const PLF_NOEXCEPT
+		{
+			return (current == rh.current);
+		}
+
+
+
+		bool operator == (const stack_reverse_iterator<!is_const_r> &rh) const PLF_NOEXCEPT
+		{
+			return (current == rh.current);
+		}
+
+
+
+		bool operator != (const stack_reverse_iterator &rh) const PLF_NOEXCEPT
+		{
+			return (current != rh.current);
+		}
+
+
+
+		bool operator != (const stack_reverse_iterator<!is_const_r> &rh) const PLF_NOEXCEPT
+		{
+			return (current != rh.current);
+		}
+
+
+
+		reference operator * () const PLF_NOEXCEPT
+		{
+			return *current.element_pointer;
+		}
+
+
+
+		pointer operator -> () const PLF_NOEXCEPT
+		{
+			return current.element_pointer;
+		}
+
+
+
+		stack_reverse_iterator & operator ++ ()
+		{
+			--current;
+			return *this;
+		}
+
+
+
+		stack_reverse_iterator operator ++ (int)
+		{
+			const stack_reverse_iterator copy(*this);
+			++*this;
+			return copy;
+		}
+
+
+
+		stack_reverse_iterator & operator -- ()
+		{
+			++current;
+			return *this;
+		}
+
+
+
+		stack_reverse_iterator operator -- (int)
+		{
+			const stack_reverse_iterator copy(*this);
+			--*this;
+			return copy;
+		}
+
+
+
+		stack_iterator<is_const_r> base() const PLF_NOEXCEPT
+		{
+			return (current.group_pointer != NULL) ? ++(stack_iterator<is_const_r>(current)) : stack_iterator<is_const_r>(NULL, NULL, NULL);
+		}
+
+
+
+	private:
+		// Used by rend(), etc:
+		stack_reverse_iterator(const group_pointer_type group_p, const pointer_type element_p) PLF_NOEXCEPT: current(group_p, element_p) {}
+
+	}; // stack_reverse_iterator
+
+
 }; // stack
+
+
+#ifdef PLF_CPP20_SUPPORT
+	template <class T>
+	concept stack_iterator_concept = requires { typename T::stack_iterator_tag; };
+#endif
 
 } // plf namespace
 
@@ -1648,10 +2231,21 @@ void swap (plf::stack<element_type, allocator_type> &a, plf::stack<element_type,
 	a.swap(b);
 }
 
+
+
+#ifdef PLF_CPP20_SUPPORT
+	// std::reverse_iterator overload, to allow use of stack with ranges and make_reverse_iterator primarily:
+	template <plf::stack_iterator_concept it_type>
+	class reverse_iterator<it_type> : public it_type::reverse_type
+	{
+	public:
+		typedef typename it_type::reverse_type rit;
+		using rit::rit;
+	};
+#endif
+
 }
 
-
-#undef PLF_MIN_BLOCK_CAPACITY
 
 #undef PLF_EXCEPTIONS_SUPPORT
 #undef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT

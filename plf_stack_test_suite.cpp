@@ -444,9 +444,60 @@ int main()
 
 				failpass("Unequal size append test 1", check_number == 31125);
 			}
-
 		}
 
+
+
+		{
+			title1("Iterator tests");
+
+			stack<int> istack;
+			int total = 0;
+
+			for (int temp = 0; temp != 1000; ++temp)
+			{
+				istack.push(1);
+				++total;
+			}
+
+			int number_of_elements = static_cast<int>(istack.size());
+
+			for (stack<int>::iterator current = istack.begin(); current != istack.end(); ++current)
+			{
+				total -= *current;
+				--number_of_elements;
+			}
+
+			failpass("Iterator test 1", total == 0 && number_of_elements == 0);
+
+			istack.pop();
+			istack.pop();
+			istack.pop();
+			istack.pop();
+			istack.pop();
+
+			number_of_elements = static_cast<int>(istack.size());
+
+			for (stack<int>::iterator current = istack.begin(); current != istack.end(); ++current)
+			{
+				--number_of_elements;
+			}
+
+			failpass("Iterator test 2", number_of_elements == 0);
+
+			istack.push(1);
+			istack.push(1);
+
+			number_of_elements = static_cast<int>(istack.size());
+
+			for (stack<int>::reverse_iterator current = istack.rbegin(); current != istack.rend(); ++current)
+			{
+				--number_of_elements;
+			}
+
+			failpass("Reverse Iterator test 1", number_of_elements == 0);
+
+		}
 	}
 
 	title1("Test Suite PASS - Press ENTER to Exit");
