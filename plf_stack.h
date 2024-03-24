@@ -38,9 +38,9 @@
 #endif
 
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
-    // Suppress incorrect (unfixed MSVC bug) warnings re: constant expressions in constexpr-if statements
+	 // Suppress incorrect (unfixed MSVC bug) warnings re: constant expressions in constexpr-if statements
 	#pragma warning ( push )
-    #pragma warning ( disable : 4127 )
+	#pragma warning ( disable : 4127 )
 
 	#if _MSC_VER >= 1600
 		#define PLF_MOVE_SEMANTICS_SUPPORT
@@ -296,7 +296,7 @@ namespace plf
 			return value == compare_value;
 		}
 	};
-	
+
 
 
 	// To enable conversion to void * when allocator supplies non-raw pointers:
@@ -443,15 +443,15 @@ public:
 	{
 		return (sizeof(element_type) * 8 > (sizeof(stack) + sizeof(group)) * 2) ? 8 : (((sizeof(stack) + sizeof(group)) * 2) / sizeof(element_type)) + 1;
 	}
-	
-	
+
+
 
 	static PLF_CONSTFUNC size_type default_max_block_capacity() PLF_NOEXCEPT
 	{
 		return std::numeric_limits<size_type>::max() / 2;
 	}
-	
-	
+
+
 
 	// Default constructor:
 	PLF_CONSTFUNC stack() PLF_NOEXCEPT_ALLOCATOR:
@@ -465,7 +465,7 @@ public:
 		min_block_capacity(default_min_block_capacity()),
 		group_allocator_pair(default_max_block_capacity(), *this)
 	{}
-	
+
 
 
 	// Allocator-extended constructor:
@@ -835,7 +835,7 @@ public:
 
 		// Create element:
 		#ifdef PLF_EXCEPTIONS_SUPPORT
-			#if defined(PLF_TYPE_TRAITS_SUPPORT)
+			#ifdef PLF_TYPE_TRAITS_SUPPORT
 				if PLF_CONSTEXPR (std::is_nothrow_copy_constructible<element_type>::value)
 				{
 					PLF_CONSTRUCT(allocator_type, *this, top_element, element);
@@ -887,7 +887,7 @@ public:
 
 
 			#ifdef PLF_EXCEPTIONS_SUPPORT
-				#if defined(PLF_TYPE_TRAITS_SUPPORT)
+				#ifdef PLF_TYPE_TRAITS_SUPPORT
 					if PLF_CONSTEXPR (std::is_nothrow_move_constructible<element_type>::value)
 					{
 						PLF_CONSTRUCT(allocator_type, *this, top_element, std::move(element));
@@ -941,7 +941,7 @@ public:
 
 
 			#ifdef PLF_EXCEPTIONS_SUPPORT
-				#if defined(PLF_TYPE_TRAITS_SUPPORT)
+				#ifdef PLF_TYPE_TRAITS_SUPPORT
 					if PLF_CONSTEXPR (std::is_nothrow_constructible<element_type>::value)
 					{
 						PLF_CONSTRUCT(allocator_type, *this, top_element, std::forward<arguments>(parameters)...);
@@ -1119,12 +1119,10 @@ public:
 	size_type memory() const PLF_NOEXCEPT
 	{
 		size_type memory_use = sizeof(*this) + (sizeof(value_type) * total_capacity);
-		group_pointer_type temp_group = first_group;
 
-		while (temp_group != NULL)
+		for (group_pointer_type current = first_group; current != NULL; current = current->next_group)
 		{
 			memory_use += sizeof(group);
-			temp_group = temp_group->next_group;
 		}
 
 		return memory_use;
@@ -1262,45 +1260,20 @@ public:
 
 
 
-	bool operator == (const stack &rh) const PLF_NOEXCEPT
+	friend bool operator == (const queue &lh, const queue &rh) PLF_NOEXCEPT
 	{
-		assert (this != &rh);
+		assert (&lh != &rh);
 
-		if (total_size != rh.total_size)
+		if (lh.total_size != rh.total_size)
 		{
 			return false;
 		}
 
-		if (total_size == 0)
+		for (const_iterator lh_iterator = lh.begin_iterator, rh_iterator = rh.begin_iterator; lh_iterator != lh.end_iterator; ++lh_iterator, ++rh_iterator)
 		{
-			return true;
-		}
-
-		group_pointer_type this_group = first_group, rh_group = rh.first_group;
-		element_pointer_type this_pointer = first_group->elements, rh_pointer = rh.first_group->elements;
-
-		while(true)
-		{
-			if (*this_pointer != *rh_pointer)
+			if (*lh_iterator != *rh_iterator)
 			{
 				return false;
-			}
-
-			if (this_pointer == top_element)
-			{
-				break;
-			}
-
-			if (++this_pointer == this_group->end)
-			{
-				this_group = this_group->next_group;
-				this_pointer = this_group->elements;
-			}
-
-			if (++rh_pointer == rh_group->end)
-			{
-				rh_group = rh_group->next_group;
-				rh_pointer = rh_group->elements;
 			}
 		}
 
@@ -1309,9 +1282,9 @@ public:
 
 
 
-	bool operator != (const stack &rh) const PLF_NOEXCEPT
+	friend bool operator != (const queue &lh, const queue &rh) PLF_NOEXCEPT
 	{
-		return !(*this == rh);
+		return !(lh == rh);
 	}
 
 
@@ -1659,7 +1632,7 @@ public:
 	friend class stack_reverse_iterator<true>;
 
 
-	
+
 	iterator begin() PLF_NOEXCEPT
 	{
 		return iterator(first_group, first_group->elements);
