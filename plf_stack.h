@@ -1260,7 +1260,7 @@ public:
 
 
 
-	friend bool operator == (const queue &lh, const queue &rh) PLF_NOEXCEPT
+	friend bool operator == (const stack &lh, const stack &rh) PLF_NOEXCEPT
 	{
 		assert (&lh != &rh);
 
@@ -1282,7 +1282,7 @@ public:
 
 
 
-	friend bool operator != (const queue &lh, const queue &rh) PLF_NOEXCEPT
+	friend bool operator != (const stack &lh, const stack &rh) PLF_NOEXCEPT
 	{
 		return !(lh == rh);
 	}
