@@ -1253,11 +1253,9 @@ public:
 
 	friend bool operator == (const stack &lh, const stack &rh) PLF_NOEXCEPT
 	{
-		assert (&lh != &rh);
-
 		if (lh.total_size != rh.total_size) return false;
 
-		for (const_iterator lh_iterator = lh.begin_iterator, rh_iterator = rh.begin_iterator; lh_iterator != lh.end_iterator; ++lh_iterator, ++rh_iterator)
+		for (const_iterator lh_iterator = lh.cbegin(), rh_iterator = rh.cbegin(); lh_iterator != lh.cend(); ++lh_iterator, ++rh_iterator)
 		{
 			if (*lh_iterator != *rh_iterator) return false;
 		}
