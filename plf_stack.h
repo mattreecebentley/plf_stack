@@ -369,7 +369,7 @@ private:
 
 
 		#ifdef PLF_VARIADICS_SUPPORT
-			group(const size_type elements_per_group, group_pointer_type const previous = NULL):
+			group(const size_type elements_per_group, const group_pointer_type previous = NULL):
 				elements(PLF_ALLOCATE(allocator_type, *this, elements_per_group, (previous == NULL) ? 0 : previous->elements)),
 				next_group(NULL),
 				previous_group(previous),
@@ -377,7 +377,7 @@ private:
 			{}
 		#else
 			// This is a hack around the fact that allocator_type::construct only supports copy construction in C++03 and copy elision does not occur on the vast majority of compilers in this circumstance. And to avoid running out of memory (and performance loss) from allocating the same block twice, we're allocating in the copy constructor.
-			group(const size_type elements_per_group, group_pointer_type const previous = NULL) PLF_NOEXCEPT:
+			group(const size_type elements_per_group, const group_pointer_type previous = NULL) PLF_NOEXCEPT:
 				elements(NULL),
 				next_group(reinterpret_cast<group_pointer_type>(elements_per_group)),
 				previous_group(previous),
@@ -518,7 +518,7 @@ public:
 
 private:
 
-	void allocate_new_group(const size_type capacity, group_pointer_type const previous_group)
+	void allocate_new_group(const size_type capacity, const group_pointer_type previous_group)
 	{
 		previous_group->next_group = PLF_ALLOCATE(group_allocator_type, group_allocator_pair, 1, previous_group);
 
@@ -549,7 +549,7 @@ private:
 
 
 
-	void deallocate_group(group_pointer_type const the_group) PLF_NOEXCEPT
+	void deallocate_group(const group_pointer_type the_group) PLF_NOEXCEPT
 	{
 		PLF_DESTROY(group_allocator_type, group_allocator_pair, the_group);
 		PLF_DEALLOCATE(group_allocator_type, group_allocator_pair, the_group, 1);
@@ -1457,7 +1457,7 @@ public:
 
 		if (elements_to_be_transferred != 0)
 		{
-			element_pointer_type const start = source.top_element - (elements_to_be_transferred - 1);
+			const element_pointer_type start = source.top_element - (elements_to_be_transferred - 1);
 
 			#ifdef PLF_TYPE_TRAITS_SUPPORT
 				if PLF_CONSTEXPR (std::is_trivially_copyable<element_type>::value && std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible iterators ie. all iterators, unless allocator returns non-trivial pointers
