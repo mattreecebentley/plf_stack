@@ -1748,7 +1748,7 @@ public:
 				template <bool is_const_it = is_const, class = typename plf::enable_if<is_const_it>::type >
 				stack_iterator(stack_iterator<false> &&source) PLF_NOEXCEPT:
 			#else
-				stack_iterator(const stack_iterator<!is_const> &&source) PLF_NOEXCEPT:
+				stack_iterator(stack_iterator<!is_const> &&source) PLF_NOEXCEPT:
 			#endif
 				group_pointer(std::move(source.group_pointer)),
 				element_pointer(std::move(source.element_pointer))
@@ -1793,9 +1793,9 @@ public:
 
 			#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 				template <bool is_const_it = is_const, class = typename plf::enable_if<is_const_it>::type >
-				stack_iterator & operator = (const stack_iterator<false> &&source) PLF_NOEXCEPT
+				stack_iterator & operator = (stack_iterator<false> &&source) PLF_NOEXCEPT
 			#else
-				stack_iterator & operator = (const stack_iterator<!is_const> &&source) PLF_NOEXCEPT
+				stack_iterator & operator = (stack_iterator<!is_const> &&source) PLF_NOEXCEPT
 			#endif
 			{
 				group_pointer = std::move(source.group_pointer);
@@ -1982,7 +1982,7 @@ public:
 				template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
 				stack_reverse_iterator (stack_reverse_iterator<false> &&source) PLF_NOEXCEPT:
 			#else
-				stack_reverse_iterator (const stack_iterator<!is_const_r> &&source) PLF_NOEXCEPT:
+				stack_reverse_iterator (stack_iterator<!is_const_r> &&source) PLF_NOEXCEPT:
 			#endif
 				current(std::move(source.current))
 			{}
