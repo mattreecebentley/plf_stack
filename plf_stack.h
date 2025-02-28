@@ -1022,47 +1022,63 @@ public:
 
 
 	#ifdef PLF_MOVE_SEMANTICS_SUPPORT
+	private:
+
+		void move_assign(stack &&source) PLF_NOEXCEPT_MOVE_ASSIGN(allocator_type)
+		{
+			#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT
+				if PLF_CONSTEXPR ((std::is_trivially_copyable<allocator_type>::value || std::allocator_traits<allocator_type>::is_always_equal::value) &&
+					std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value)
+				{
+					std::memcpy(static_cast<void *>(this), &source, sizeof(stack));
+				}
+				else
+			#endif
+			{
+				current_group = std::move(source.current_group);
+				first_group = std::move(source.first_group);
+				top_element = std::move(source.top_element);
+				start_element = std::move(source.start_element);
+				end_element = std::move(source.end_element);
+				total_size = source.total_size;
+				total_capacity = source.total_capacity;
+				min_block_capacity = source.min_block_capacity;
+				group_allocator_pair.max_block_capacity = source.group_allocator_pair.max_block_capacity;
+
+				#ifdef PLF_ALLOCATOR_TRAITS_SUPPORT
+					if PLF_CONSTEXPR (std::allocator_traits<allocator_type>::propagate_on_container_move_assignment::value)
+				#endif
+				{
+					static_cast<allocator_type &>(*this) = std::move(static_cast<allocator_type &>(source));
+					// Reconstruct rebinds:
+					static_cast<group_allocator_type &>(group_allocator_pair) = group_allocator_type(*this);
+				}
+			}
+		}
+
+
+
+	public:
+
 		// Move assignment
 		stack & operator = (stack &&source) PLF_NOEXCEPT_MOVE_ASSIGN(allocator_type)
 		{
 			assert (&source != this);
+
 			destroy_all_data();
 
 			#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT
-				if (std::allocator_traits<allocator_type>::propagate_on_container_move_assignment::value || std::allocator_traits<allocator_type>::is_always_equal::value || static_cast<allocator_type &>(*this) == static_cast<allocator_type &>(source))
-			#else
-				if (static_cast<allocator_type &>(*this) == static_cast<allocator_type &>(source))
-			#endif
-			{
-				#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT
-					if PLF_CONSTEXPR (std::is_standard_layout<stack>::value && (std::is_trivially_copyable<allocator_type>::value || std::allocator_traits<allocator_type>::is_always_equal::value) && std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value)
-					{
-						std::memcpy(static_cast<void *>(this), &source, sizeof(stack));
-					}
-					else
-				#endif
+				if PLF_CONSTEXPR (std::allocator_traits<allocator_type>::propagate_on_container_move_assignment::value || std::allocator_traits<allocator_type>::is_always_equal::value)
 				{
-					current_group = std::move(source.current_group);
-					first_group = std::move(source.first_group);
-					top_element = std::move(source.top_element);
-					start_element = std::move(source.start_element);
-					end_element = std::move(source.end_element);
-					total_size = source.total_size;
-					total_capacity = source.total_capacity;
-					min_block_capacity = source.min_block_capacity;
-					group_allocator_pair.max_block_capacity = source.group_allocator_pair.max_block_capacity;
-
-					#ifdef PLF_ALLOCATOR_TRAITS_SUPPORT
-						if PLF_CONSTEXPR(std::allocator_traits<allocator_type>::propagate_on_container_move_assignment::value)
-					#endif
-					{
-						static_cast<allocator_type &>(*this) = std::move(static_cast<allocator_type &>(source));
-						// Reconstruct rebinds:
-						static_cast<group_allocator_type &>(group_allocator_pair) = group_allocator_type(*this);
-					}
+					move_assign(std::move(source));
 				}
+				else
+			#endif
+			if (static_cast<allocator_type &>(*this) == static_cast<allocator_type &>(source))
+			{
+				move_assign(std::move(source));
 			}
-			else // Allocator isn't movable so move elements from source and deallocate the source's blocks:
+			else // Allocator isn't movable so copy elements from source and deallocate the source's blocks:
 			{
 				stack temp(source);
 				swap(temp);
