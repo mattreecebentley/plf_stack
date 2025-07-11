@@ -406,8 +406,8 @@ private:
 
 
 	group_pointer_type		current_group, first_group; // current group is location of top pointer, first_group is 'front' group, saves performance for ~stack etc
-	element_pointer_type	top_element, start_element, end_element; // start_element/end_element cache current_group->end/elements for better performance
-	size_type				total_size, total_capacity, min_block_capacity;
+	element_pointer_type		top_element, start_element, end_element; // start_element/end_element cache current_group->end/elements for better performance
+	size_type					total_size, total_capacity, min_block_capacity;
 	struct ebco_pair : group_allocator_type // Packaging the group allocator with the least-used member variable, for empty-base-class optimization
 	{
 		size_type max_block_capacity;
@@ -711,7 +711,7 @@ private:
 	void blank() PLF_NOEXCEPT
 	{
 		#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT // allocator_traits and type_traits always available when is_always_equal is available
-			if PLF_CONSTEXPR (std::is_standard_layout<stack>::value && std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
+			if PLF_CONSTEXPR (std::is_standard_layout<stack>::value && std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivially_destructible<group_pointer_type>::value && std::is_trivially_destructible<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
 			{
 				std::memset(static_cast<void *>(this), 0, offsetof(stack, min_block_capacity));
 			}
@@ -1028,7 +1028,7 @@ public:
 		{
 			#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT
 				if PLF_CONSTEXPR ((std::is_trivially_copyable<allocator_type>::value || std::allocator_traits<allocator_type>::is_always_equal::value) &&
-					std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value)
+					std::is_trivially_copyable<group_pointer_type>::value && std::is_trivially_copyable<element_pointer_type>::value)
 				{
 					std::memcpy(static_cast<void *>(this), &source, sizeof(stack));
 				}
@@ -1049,7 +1049,7 @@ public:
 					if PLF_CONSTEXPR (std::allocator_traits<allocator_type>::propagate_on_container_move_assignment::value)
 				#endif
 				{
-					static_cast<allocator_type &>(*this) = std::move(static_cast<allocator_type &>(source));
+					static_cast<allocator_type &>(*this) = static_cast<allocator_type &>(source);
 					// Reconstruct rebinds:
 					static_cast<group_allocator_type &>(group_allocator_pair) = group_allocator_type(*this);
 				}
@@ -1078,7 +1078,7 @@ public:
 			{
 				move_assign(std::move(source));
 			}
-			else // Allocator isn't movable so copy elements from source and deallocate the source's blocks:
+			else // Allocator isn't equal so copy elements from source and deallocate the source's blocks:
 			{
 				stack temp(source);
 				swap(temp);
@@ -1544,7 +1544,7 @@ public:
 	void swap(stack &source) PLF_NOEXCEPT_SWAP(allocator_type)
 	{
 		#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT
-			if PLF_CONSTEXPR (std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivial<group_pointer_type>::value && std::is_trivial<element_pointer_type>::value) // if all pointer types are trivial we can just copy using memcpy - avoids constructors/destructors etc and is faster
+			if PLF_CONSTEXPR (std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivially_copyable<group_pointer_type>::value && std::is_trivially_copyable<element_pointer_type>::value) // if all pointer types are trivial we can just copy using memcpy - avoids constructors/destructors etc and is faster
 			{
 				char temp[sizeof(stack)];
 				std::memcpy(&temp, static_cast<void *>(this), sizeof(stack));
