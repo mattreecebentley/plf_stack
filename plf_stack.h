@@ -791,7 +791,11 @@ public:
 
 
 		// allocator-extended move constructor
-		stack(stack &&source, const allocator_type &alloc):
+		#ifdef PLF_CPP20_SUPPORT
+			stack(stack &&source, const std::type_identity_t<allocator_type> &alloc):
+		#else
+			stack(stack &&source, const allocator_type &alloc):
+		#endif
 			allocator_type(alloc),
 			current_group(std::move(source.current_group)),
 			first_group(std::move(source.first_group)),
@@ -803,6 +807,18 @@ public:
 			min_block_capacity(source.min_block_capacity),
 			group_allocator_pair(source.group_allocator_pair.max_block_capacity, alloc)
 		{
+			#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT
+				if PLF_CONSTEXPR (!std::allocator_traits<allocator_type>::is_always_equal::value)
+			#endif
+			{
+				if (alloc != static_cast<allocator_type &>(source))
+				{
+					blank();
+					*this = source;
+					source.destroy_all_data();
+				}
+			}
+
 			source.blank();
 		}
 	#endif
@@ -992,7 +1008,7 @@ public:
 			PLF_DESTROY(allocator_type, *this, top_element);
 		}
 
-		if ((--total_size != 0) & (top_element-- == start_element))
+		if (static_cast<int>(--total_size != 0) & static_cast<int>(top_element-- == start_element))
 		{ // ie. is start element, but not first group in stack
 			current_group = current_group->previous_group;
 			start_element = current_group->elements;
