@@ -952,7 +952,7 @@ public:
 
 			#ifdef PLF_EXCEPTIONS_SUPPORT
 				#ifdef PLF_TYPE_TRAITS_SUPPORT
-					if PLF_CONSTEXPR (std::is_nothrow_constructible<element_type>::value)
+					if PLF_CONSTEXPR (std::is_nothrow_constructible<element_type, arguments...>::value)
 					{
 						PLF_CONSTRUCT(allocator_type, *this, top_element, std::forward<arguments>(parameters)...);
 					}
@@ -1725,7 +1725,7 @@ public:
 		typedef typename stack::pointer				 	pointer_type;
 
 		group_pointer_type		group_pointer;
-		pointer_type 			element_pointer;
+		pointer_type 				element_pointer;
 
 	public:
 		struct stack_iterator_tag {};
