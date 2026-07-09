@@ -1355,42 +1355,42 @@ public:
 
 	iterator begin() PLF_NOEXCEPT
 	{
-		return iterator(first_group, first_group->elements);
+		return iterator(first_group, (first_group == NULL) ? NULL : first_group->elements);
 	}
 
 
 
 	const_iterator begin() const PLF_NOEXCEPT
 	{
-		return const_iterator(first_group, first_group->elements);
+		return cbegin();
 	}
 
 
 
 	iterator end() PLF_NOEXCEPT
 	{
-		return iterator(current_group, top_element + 1);
+		return iterator(current_group, top_element + (1 * (top_element != NULL)));
 	}
 
 
 
 	const_iterator end() const PLF_NOEXCEPT
 	{
-		return const_iterator(current_group, top_element + 1);
+		return cend();
 	}
 
 
 
 	const_iterator cbegin() const PLF_NOEXCEPT
 	{
-		return const_iterator(first_group, first_group->elements);
+		return const_iterator(first_group, (first_group == NULL) ? NULL : first_group->elements);
 	}
 
 
 
 	const_iterator cend() const PLF_NOEXCEPT
 	{
-		return const_iterator(current_group, top_element + 1);
+		return const_iterator(current_group, top_element + (1 * (top_element != NULL)));
 	}
 
 
@@ -1404,21 +1404,21 @@ public:
 
 	const_reverse_iterator rbegin() const PLF_NOEXCEPT
 	{
-		return const_reverse_iterator(current_group, top_element);
+		return crbegin();
 	}
 
 
 
 	reverse_iterator rend() PLF_NOEXCEPT
 	{
-		return reverse_iterator(first_group, first_group->elements - 1);
+		return reverse_iterator(first_group, (first_group == NULL) ? NULL : first_group->elements - 1);
 	}
 
 
 
 	const_reverse_iterator rend() const PLF_NOEXCEPT
 	{
-		return const_reverse_iterator(first_group, first_group->elements - 1);
+		return crend();
 	}
 
 
@@ -1432,7 +1432,7 @@ public:
 
 	const_reverse_iterator crend() const PLF_NOEXCEPT
 	{
-		return const_reverse_iterator(first_group, first_group->elements - 1);
+		return const_reverse_iterator(first_group, (first_group == NULL) ? NULL : first_group->elements - 1);
 	}
 
 
