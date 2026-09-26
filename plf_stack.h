@@ -552,34 +552,55 @@ public:
 
 
 
-	void push(const element_type &element)
+private:
+
+ 	#if defined(PLF_VARIADICS_SUPPORT) && defined(PLF_MOVE_SEMANTICS_SUPPORT) // emplace and move-insert support
+ 		#define PLF_PUSH_OBJECT std::forward<arguments>(parameters)...
+ 		#define PLF_NOTHROW_TEST_TYPE arguments...
+
+ 		template<typename... arguments>
+ 		void push_implementation(arguments &&... parameters)
+
+	#elif defined(PLF_MOVE_SEMANTICS_SUPPORT) // No emplace support, type traits may be available - this is possible under older versions of MSVC, as type_traits were implemented before variadic templates
+		#define PLF_PUSH_OBJECT std::forward<el_type>(element)
+		#define PLF_NOTHROW_TEST_TYPE el_type
+
+		template<class el_type>
+		void push_implementation(el_type &&element)
+
+	#else // Only regular insert support ie. C++03/98 compilers
+		#define PLF_PUSH_OBJECT element
+		#define PLF_NOTHROW_TEST_TYPE element_type
+
+		void push_implementation(const element_type &element)
+	#endif
 	{
 		if (top_element == NULL)
 		{
 			initialize();
 		}
-		else if (++top_element == end_element) // ie. out of capacity for current element memory block
+		else if (++top_element == end_element)
 		{
 			progress_to_next_group();
 		}
 
-		// Create element:
+
 		#ifdef PLF_EXCEPTIONS_SUPPORT
 			#ifdef PLF_TYPE_TRAITS_SUPPORT
-				if PLF_CONSTEXPR (std::is_nothrow_copy_constructible<element_type>::value)
+				if PLF_CONSTEXPR (std::is_nothrow_constructible<element_type, PLF_NOTHROW_TEST_TYPE>::value)
 				{
-					PLF_CONSTRUCT_ELEMENT(top_element, element);
+					PLF_CONSTRUCT_ELEMENT(top_element, PLF_PUSH_OBJECT);
 				}
 				else
 			#endif
 			{
 				try
 				{
-					PLF_CONSTRUCT_ELEMENT(top_element, element);
+					PLF_CONSTRUCT_ELEMENT(top_element, PLF_PUSH_OBJECT);
 				}
 				catch (...)
 				{
-					if (top_element == start_element && current_group != first_group) // for post-initialize push
+					if (top_element == start_element && current_group != first_group)
 					{
 						current_group = current_group->previous_group;
 						start_element = current_group->elements;
@@ -594,7 +615,7 @@ public:
 				}
 			}
 		#else
-			PLF_CONSTRUCT_ELEMENT(top_element, element);
+			PLF_CONSTRUCT_ELEMENT(top_element, PLF_PUSH_OBJECT);
 		#endif
 
 		++total_size;
@@ -602,109 +623,31 @@ public:
 
 
 
+
+public:
+
+	void push(const element_type &element)
+	{
+		push_implementation(element);
+	}
+
+
+
 	#ifdef PLF_MOVE_SEMANTICS_SUPPORT
-		// Note: the reason for code duplication from non-move push, as opposed to using std::forward for both, was because most compilers didn't actually create as-optimal code in that strategy. Also C++03 compatibility.
 		void push(element_type &&element)
 		{
-			if (top_element == NULL)
-			{
-				initialize();
-			}
-			else if (++top_element == end_element)
-			{
-				progress_to_next_group();
-			}
-
-
-			#ifdef PLF_EXCEPTIONS_SUPPORT
-				#ifdef PLF_TYPE_TRAITS_SUPPORT
-					if PLF_CONSTEXPR (std::is_nothrow_move_constructible<element_type>::value)
-					{
-						PLF_CONSTRUCT_ELEMENT(top_element, std::move(element));
-					}
-					else
-				#endif
-				{
-					try
-					{
-						PLF_CONSTRUCT_ELEMENT(top_element, std::move(element));
-					}
-					catch (...)
-					{
-						if (top_element == start_element && current_group != first_group)
-						{
-							current_group = current_group->previous_group;
-							start_element = current_group->elements;
-							top_element = current_group->end - 1;
-						}
-						else
-						{
-							--top_element;
-						}
-
-						throw;
-					}
-				}
-			#else
-				PLF_CONSTRUCT_ELEMENT(top_element, std::move(element));
-			#endif
-
-			++total_size;
+			push_implementation(std::move(element));
 		}
-	#endif
 
 
 
-
-	#ifdef PLF_VARIADICS_SUPPORT
-		template<typename... arguments>
-		void emplace(arguments &&... parameters)
-		{
-			if (top_element == NULL)
+		#ifdef PLF_VARIADICS_SUPPORT
+			template<typename... arguments>
+			void emplace(arguments &&... parameters)
 			{
-				initialize();
+				push_implementation(std::forward<arguments>(parameters)...);
 			}
-			else if (++top_element == end_element)
-			{
-				progress_to_next_group();
-			}
-
-
-			#ifdef PLF_EXCEPTIONS_SUPPORT
-				#ifdef PLF_TYPE_TRAITS_SUPPORT
-					if PLF_CONSTEXPR (std::is_nothrow_constructible<element_type, arguments...>::value)
-					{
-						PLF_CONSTRUCT_ELEMENT(top_element, std::forward<arguments>(parameters)...);
-					}
-					else
-				#endif
-				{
-					try
-					{
-						PLF_CONSTRUCT_ELEMENT(top_element, std::forward<arguments>(parameters)...);
-					}
-					catch (...)
-					{
-						if (top_element == start_element && current_group != first_group)
-						{
-							current_group = current_group->previous_group;
-							start_element = current_group->elements;
-							top_element = current_group->end - 1;
-						}
-						else
-						{
-							--top_element;
-						}
-
-						throw;
-					}
-				}
-			#else
-				PLF_CONSTRUCT_ELEMENT(top_element, std::forward<arguments>(parameters)...);
-			#endif
-
-			++total_size;
-		}
+		#endif
 	#endif
 
 
