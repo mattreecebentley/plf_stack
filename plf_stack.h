@@ -621,6 +621,8 @@ private:
 		++total_size;
 	}
 
+	#undef PLF_PUSH_OBJECT
+	#undef PLF_NOTHROW_TEST_TYPE
 
 
 
