@@ -910,9 +910,6 @@ public:
 	{
 		check_capacities_conformance(min, max);
 
-		min_block_capacity = min;
-		group_allocator_pair.max_block_capacity = max;
-
 		// Need to check all group sizes, because append might append smaller blocks to the end of a larger block:
 		for (group_pointer_type current = first_group; current != NULL; current = current->next_group)
 		{
@@ -930,12 +927,17 @@ public:
 					else
 				#endif
 				{
+					min_block_capacity = min;
+					group_allocator_pair.max_block_capacity = max;
 					consolidate();
 				}
 
 				return;
 			}
 		}
+
+		min_block_capacity = min;
+		group_allocator_pair.max_block_capacity = max;
 	}
 
 
