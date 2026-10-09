@@ -910,9 +910,6 @@ public:
 	{
 		check_capacities_conformance(min, max);
 
-		min_block_capacity = min;
-		group_allocator_pair.max_block_capacity = max;
-
 		// Need to check all group sizes, because append might append smaller blocks to the end of a larger block:
 		for (group_pointer_type current = first_group; current != NULL; current = current->next_group)
 		{
@@ -922,7 +919,7 @@ public:
 					if PLF_CONSTEXPR (!((std::is_copy_constructible<element_type>::value && std::is_copy_assignable<element_type>::value) || (std::is_move_constructible<element_type>::value && std::is_move_assignable<element_type>::value)))
 					{
 						#ifdef PLF_EXCEPTIONS_SUPPORT
-							throw;
+							throw std::length_error("A memory block capacity is outside of the supplied limits, and the element type is neither copyable nor movable, so the blocks cannot be consolidated");
 						#else
 							std::terminate();
 						#endif
@@ -930,12 +927,17 @@ public:
 					else
 				#endif
 				{
+					min_block_capacity = min;
+					group_allocator_pair.max_block_capacity = max;
 					consolidate();
 				}
 
 				return;
 			}
 		}
+
+		min_block_capacity = min;
+		group_allocator_pair.max_block_capacity = max;
 	}
 
 
