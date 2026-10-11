@@ -311,20 +311,6 @@ private:
 
 
 
-	void progress_to_next_group() // used by push/emplace
-	{
-		if (current_group->next_group == NULL) // no reserved groups or groups left over from previous pops, allocate new group
-		{
-			allocate_new_group((total_size < group_allocator_pair.max_block_capacity) ? total_size : group_allocator_pair.max_block_capacity, current_group);
-		}
-
-		current_group = current_group->next_group;
-		start_element = top_element = current_group->elements;
-		end_element = current_group->end;
-	}
-
-
-
 	void copy_from_source(const stack &source) // Note: this function is only called on an empty un-initialize()'d stack
 	{
 		assert(&source != this);
@@ -554,6 +540,20 @@ public:
 
 private:
 
+	void progress_to_next_group() // used by push/emplace
+	{
+		if (current_group->next_group == NULL) // no reserved groups or groups left over from previous pops, allocate new group
+		{
+			allocate_new_group((total_size < group_allocator_pair.max_block_capacity) ? total_size : group_allocator_pair.max_block_capacity, current_group);
+		}
+
+		current_group = current_group->next_group;
+		start_element = top_element = current_group->elements;
+		end_element = current_group->end;
+	}
+
+
+
  	#if defined(PLF_VARIADICS_SUPPORT) && defined(PLF_MOVE_SEMANTICS_SUPPORT) // emplace and move-insert support
  		#define PLF_PUSH_OBJECT std::forward<arguments>(parameters)...
  		#define PLF_NOTHROW_TEST_TYPE arguments...
@@ -604,13 +604,10 @@ private:
 					{
 						current_group = current_group->previous_group;
 						start_element = current_group->elements;
-						top_element = current_group->end - 1;
-					}
-					else
-					{
-						--top_element;
+						top_element = current_group->end;
 					}
 
+					--top_element;
 					throw;
 				}
 			}
