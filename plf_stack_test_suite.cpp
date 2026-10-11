@@ -423,6 +423,34 @@ int main()
 
 				failpass("Unequal size append test 1", check_number == 31125);
 			}
+
+
+			{ // The source's blocks are linked after the destination's full top block, so their capacity has to be added
+				stack<int> stack1(3, 3), stack2(3, 3);
+
+				for (int number = 0; number != 3; ++number)
+				{
+					stack1.push(number); // one full block
+				}
+
+				for (int number = 0; number != 6; ++number)
+				{
+					stack2.push(number); // two full blocks
+				}
+
+				stack1.append(stack2);
+
+				failpass("Append capacity test", stack1.size() == 9 && stack1.capacity() == 9);
+
+				for (int number = 0; number != 6; ++number)
+				{
+					stack1.pop();
+				}
+
+				stack1.trim(); // deallocates the two blocks from stack2
+
+				failpass("Append capacity after trim test", stack1.size() == 3 && stack1.capacity() == 3);
+			}
 		}
 
 

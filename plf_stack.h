@@ -1213,6 +1213,7 @@ public:
 		top_element = source.top_element;
 		start_element = source.start_element;
 		end_element = source.end_element;
+		total_capacity += source.total_capacity;
 
 		// Correct group sizes if necessary:
 		if (source.min_block_capacity < min_block_capacity) min_block_capacity = source.min_block_capacity;
