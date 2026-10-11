@@ -1316,6 +1316,11 @@ public:
 
 	iterator end() PLF_NOEXCEPT
 	{
+		if (top_element != NULL && top_element + 1 == end_element && current_group->next_group != NULL) // The top element is the last in its block and an emptied block is kept after it: operator ++ moves from the top element to the start of that block, so end() must be there too
+		{
+			return iterator(current_group->next_group, current_group->next_group->elements);
+		}
+
 		return iterator(current_group, top_element + (1 * (top_element != NULL)));
 	}
 
@@ -1337,6 +1342,11 @@ public:
 
 	const_iterator cend() const PLF_NOEXCEPT
 	{
+		if (top_element != NULL && top_element + 1 == end_element && current_group->next_group != NULL) // The top element is the last in its block and an emptied block is kept after it: operator ++ moves from the top element to the start of that block, so end() must be there too
+		{
+			return const_iterator(current_group->next_group, current_group->next_group->elements);
+		}
+
 		return const_iterator(current_group, top_element + (1 * (top_element != NULL)));
 	}
 
