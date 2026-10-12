@@ -451,6 +451,46 @@ int main()
 
 				failpass("Append capacity after trim test", stack1.size() == 3 && stack1.capacity() == 3);
 			}
+
+
+			#ifdef PLF_EXCEPTIONS_SUPPORT
+			{ // The block capacity limits are checked before either stack is changed
+				stack<int> stack1(3, 3), stack2(10, 10);
+				stack1.push(1);
+
+				for (int number = 10; number != 15; ++number)
+				{
+					stack2.push(number); // one block of 10, larger than stack1's maximum block capacity
+				}
+
+				bool threw_length_error = false;
+
+				try
+				{
+					stack1.append(stack2);
+				}
+				catch (const std::length_error &)
+				{
+					threw_length_error = true;
+				}
+
+				failpass("Append with incompatible block capacities throws length_error test", threw_length_error);
+				failpass("Append with incompatible block capacities leaves both stacks unchanged test", stack1.size() == 1 && stack1.top() == 1 && stack2.size() == 5 && stack2.top() == 14);
+
+				stack1.pop();
+
+				int check_number = 14;
+				bool stack2_unchanged = true;
+
+				while (!stack2.empty())
+				{
+					stack2_unchanged = stack2_unchanged && stack2.top() == check_number--;
+					stack2.pop();
+				}
+
+				failpass("Append with incompatible block capacities pop test", stack1.empty() && stack2_unchanged && check_number == 9);
+			}
+			#endif
 		}
 
 
