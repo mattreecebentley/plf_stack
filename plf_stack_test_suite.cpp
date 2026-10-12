@@ -476,6 +476,35 @@ int main()
 
 			failpass("Reverse Iterator test 1", number_of_elements == 0);
 
+			{ // The top element is the last in its block, and the block after it was emptied by pop() and kept
+				stack<int> kept_stack(3, 3);
+
+				for (int counter = 0; counter != 4; ++counter)
+				{
+					kept_stack.push(counter);
+				}
+
+				kept_stack.pop();
+
+				number_of_elements = 0;
+
+				for (stack<int>::iterator current = kept_stack.begin(); current != kept_stack.end(); ++current)
+				{
+					if (++number_of_elements == 4) break; // There are only three elements
+				}
+
+				failpass("Iterator test with a kept block after the top block", number_of_elements == 3 && *--kept_stack.end() == 2);
+
+				stack<int> compare_stack(3, 3);
+
+				for (int counter = 0; counter != 3; ++counter)
+				{
+					compare_stack.push(counter);
+				}
+
+				failpass("Equality operator test with a kept block after the top block", kept_stack == compare_stack);
+			}
+
 		}
 	}
 
