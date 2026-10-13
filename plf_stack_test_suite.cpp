@@ -490,6 +490,29 @@ int main()
 
 				failpass("Append with incompatible block capacities pop test", stack1.empty() && stack2_unchanged && check_number == 9);
 			}
+
+
+			{ // The same check applies when the destination is empty, rather than moving the source in
+				stack<int> stack1(3, 3), stack2(10, 10);
+
+				for (int number = 10; number != 15; ++number)
+				{
+					stack2.push(number);
+				}
+
+				bool threw_length_error = false;
+
+				try
+				{
+					stack1.append(stack2);
+				}
+				catch (const std::length_error &)
+				{
+					threw_length_error = true;
+				}
+
+				failpass("Append to an empty stack with incompatible block capacities throws length_error test", threw_length_error && stack1.empty() && stack2.size() == 5 && stack2.top() == 14);
+			}
 			#endif
 		}
 

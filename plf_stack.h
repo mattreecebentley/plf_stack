@@ -1088,18 +1088,6 @@ public:
 		{
 			return;
 		}
-		else if (total_size == 0)
-		{
-			#ifdef PLF_MOVE_SEMANTICS_SUPPORT
-				*this = std::move(source);
-			#else
-				destroy_all_data();
-				blank();
-				swap(source);
-			#endif
-
-			return;
-		}
 
 		// Throw if incompatible group capacity found, before either stack is changed. Groups after the source's current group are unused and are not transferred:
 		if (source.min_block_capacity < min_block_capacity || source.group_allocator_pair.max_block_capacity > group_allocator_pair.max_block_capacity)
@@ -1117,6 +1105,20 @@ public:
 
 				if (current == source.current_group) break;
 			}
+		}
+
+
+		if (total_size == 0)
+		{
+			#ifdef PLF_MOVE_SEMANTICS_SUPPORT
+				*this = std::move(source);
+			#else
+				destroy_all_data();
+				blank();
+				swap(source);
+			#endif
+
+			return;
 		}
 
 
