@@ -1088,7 +1088,27 @@ public:
 		{
 			return;
 		}
-		else if (total_size == 0)
+
+		// Throw if incompatible group capacity found, before either stack is changed. Groups after the source's current group are unused and are not transferred:
+		if (source.min_block_capacity < min_block_capacity || source.group_allocator_pair.max_block_capacity > group_allocator_pair.max_block_capacity)
+		{
+			for (group_pointer_type current = source.first_group; ; current = current->next_group)
+			{
+				if (static_cast<size_type>(current->end - current->elements) < min_block_capacity || static_cast<size_type>(current->end - current->elements) > group_allocator_pair.max_block_capacity)
+				{
+					#ifdef PLF_EXCEPTIONS_SUPPORT
+						throw std::length_error("A source memory block capacity is outside of the destination's minimum or maximum memory block capacity limits - please change either the source or the destination's min/max block capacity limits using reshape() before calling append() in this case");
+					#else
+						std::terminate();
+					#endif
+				}
+
+				if (current == source.current_group) break;
+			}
+		}
+
+
+		if (total_size == 0)
 		{
 			#ifdef PLF_MOVE_SEMANTICS_SUPPORT
 				*this = std::move(source);
@@ -1100,6 +1120,7 @@ public:
 
 			return;
 		}
+
 
 		total_size += source.total_size;
 
@@ -1184,23 +1205,6 @@ public:
 		// Trim trailing groups on both, link source and destinations groups and remove references to source groups from source:
 		source.trim();
 		trim();
-
-
-		// Throw if incompatible group capacity found:
-		if (source.min_block_capacity < min_block_capacity || source.group_allocator_pair.max_block_capacity > group_allocator_pair.max_block_capacity)
-		{
-			for (group_pointer_type current = source.first_group; current != NULL; current = current->next_group)
-			{
-				if (static_cast<size_type>(current->end - current->elements) < min_block_capacity || static_cast<size_type>(current->end - current->elements) > group_allocator_pair.max_block_capacity)
-				{
-					#ifdef PLF_EXCEPTIONS_SUPPORT
-						throw std::length_error("A source memory block capacity is outside of the destination's minimum or maximum memory block capacity limits - please change either the source or the destination's min/max block capacity limits using reshape() before calling append() in this case");
-					#else
-						std::terminate();
-					#endif
-				}
-			}
-		}
 
 
 		current_group->next_group = source.first_group;
