@@ -1089,7 +1089,7 @@ public:
 			return;
 		}
 
-		// Throw if incompatible group capacity found, before either stack is changed. Groups after the source's current group are unused and are not transferred:
+		// Throw if incompatible group capacity found, before either stack is changed. Groups after the source's current group are unused and are not transferred, hence they are not checked:
 		if (source.min_block_capacity < min_block_capacity || source.group_allocator_pair.max_block_capacity > group_allocator_pair.max_block_capacity)
 		{
 			for (group_pointer_type current = source.first_group; ; current = current->next_group)
@@ -1215,11 +1215,6 @@ public:
 		start_element = source.start_element;
 		end_element = source.end_element;
 		total_capacity += source.total_capacity;
-
-		// Correct group sizes if necessary:
-		if (source.min_block_capacity < min_block_capacity) min_block_capacity = source.min_block_capacity;
-
-		if (source.group_allocator_pair.max_block_capacity < group_allocator_pair.max_block_capacity) group_allocator_pair.max_block_capacity = source.group_allocator_pair.max_block_capacity;
 
 		source.blank();
 	}
