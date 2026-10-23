@@ -7,7 +7,67 @@
 	#include <utility> // std::move
 #endif
 
+#include <algorithm> // std::sort
+#include <limits> // std::numeric_limits
+#include <map>
+#include <vector>
+
+#ifdef PLF_CPP20_SUPPORT
+	#include <compare> // std::strong_ordering, std::weak_ordering, std::partial_ordering, std::three_way_comparable
+	#include <type_traits> // std::is_same_v
+#endif
+
 #include "plf_stack.h"
+
+
+
+
+// Element types for the comparison operator tests:
+struct less_only_type // Has < but not <=>
+{
+	int value;
+
+	less_only_type(const int v) : value(v) {}
+	bool operator < (const less_only_type &rh) const { return value < rh.value; }
+	bool operator != (const less_only_type &rh) const { return value != rh.value; }
+};
+
+
+struct unordered_type // Has != (for ==) but no ordering
+{
+	int value;
+
+	unordered_type(const int v) : value(v) {}
+	bool operator != (const unordered_type &rh) const { return value != rh.value; }
+};
+
+
+#ifdef PLF_CPP20_SUPPORT
+	struct non_bool_result // Result of non_bool_less_type's <, cannot be used as a bool
+	{
+		explicit operator bool() const = delete;
+	};
+
+
+	struct non_bool_less_type // Has < but its result is not convertible to bool
+	{
+		int value;
+
+		non_bool_less_type(const int v) : value(v) {}
+		non_bool_result operator < (const non_bool_less_type &) const { return non_bool_result(); }
+		bool operator != (const non_bool_less_type &rh) const { return value != rh.value; }
+	};
+#endif
+
+
+template <class container_type, class value_type>
+void push_values(container_type &container, const value_type *values, const unsigned int count)
+{
+	for (unsigned int index = 0; index != count; ++index)
+	{
+		container.push(values[index]);
+	}
+}
 
 
 
@@ -596,6 +656,110 @@ int main()
 				failpass("Equality operator test with a kept block after the top block", kept_stack == compare_stack);
 			}
 
+		}
+
+
+		{
+			title1("Comparison operator tests");
+
+			// Block capacity 3, so containers with more than 3 elements span several blocks
+			stack<int> empty1(3, 3), empty2(3, 3), one(3, 3), one_two(3, 3), one_three(3, 3), one_two_zero(3, 3), two_one(3, 3), long1(3, 3), long2(3, 3), long_differs(3, 3);
+
+			const int one_values[] = {1}, one_two_values[] = {1, 2}, one_three_values[] = {1, 3}, one_two_zero_values[] = {1, 2, 0}, two_one_values[] = {2, 1};
+			const int long_values[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, long_differs_values[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 10};
+
+			push_values(one, one_values, 1);
+			push_values(one_two, one_two_values, 2);
+			push_values(one_three, one_three_values, 2);
+			push_values(one_two_zero, one_two_zero_values, 3);
+			push_values(two_one, two_one_values, 2);
+			push_values(long1, long_values, 10);
+			push_values(long2, long_values, 10);
+			push_values(long_differs, long_differs_values, 10);
+
+			failpass("Comparison of two empty stacks", !(empty1 < empty2) && !(empty1 > empty2) && empty1 <= empty2 && empty1 >= empty2);
+			failpass("Empty stack is less than non-empty stack", empty1 < one && one > empty1 && empty1 <= one && !(empty1 >= one));
+			failpass("Comparison of stacks differing in the last element", one_two < one_three && one_three > one_two && !(one_three < one_two));
+			failpass("Prefix stack is less than longer stack", one_two < one_two_zero && !(one_two_zero < one_two) && one_two <= one_two_zero);
+			failpass("Elements compared bottom to top", one_two < two_one && !(two_one < one_two));
+			failpass("Comparison of equal multi-block stacks", !(long1 < long2) && !(long1 > long2) && long1 <= long2 && long1 >= long2);
+			failpass("Comparison of multi-block stacks differing in the last block", long1 < long_differs && long_differs > long1 && !(long_differs <= long1));
+
+			{ // The first has a kept empty block after its top block, the second has a different block capacity
+				stack<int> popped_stack(3, 3), other_stack(4, 100);
+
+				for (int counter = 0; counter != 10; ++counter)
+				{
+					popped_stack.push(counter);
+				}
+
+				for (int counter = 0; counter != 4; ++counter)
+				{
+					popped_stack.pop();
+				}
+
+				for (int counter = 0; counter != 6; ++counter)
+				{
+					other_stack.push(counter);
+				}
+
+				failpass("Comparison of equal stacks with different block layouts", !(popped_stack < other_stack) && !(other_stack < popped_stack) && popped_stack <= other_stack && popped_stack >= other_stack);
+
+				#ifdef PLF_CPP20_SUPPORT
+					failpass("Three-way comparison of equal stacks with different block layouts", (popped_stack <=> other_stack) == 0);
+				#endif
+
+				other_stack.push(10);
+
+				failpass("Comparison of stacks with different block layouts differing in length", popped_stack < other_stack && !(other_stack <= popped_stack));
+			}
+
+			std::map<stack<int>, int> stack_map;
+			stack_map[one_two] = 1;
+			stack_map[empty1] = 2;
+			stack_map[one_three] = 3;
+			stack_map[one_two] = 4; // Existing key
+
+			failpass("stack as std::map key test", stack_map.size() == 3 && stack_map.begin()->second == 2 && stack_map[one_two] == 4);
+
+			std::vector<stack<int> > stack_vector;
+			stack_vector.push_back(one_three);
+			stack_vector.push_back(empty1);
+			stack_vector.push_back(one_two);
+			std::sort(stack_vector.begin(), stack_vector.end());
+
+			failpass("std::sort on stacks test", stack_vector[0] == empty1 && stack_vector[1] == one_two && stack_vector[2] == one_three);
+
+			stack<less_only_type> less_only1, less_only2;
+			less_only1.push(less_only_type(1));
+			less_only2.push(less_only_type(2));
+
+			failpass("Comparison of stacks of an element type with only <", less_only1 < less_only2 && !(less_only2 <= less_only1));
+
+			stack<unordered_type> unordered1, unordered2; // Comparison operators must not be instantiated for this type
+			unordered1.push(unordered_type(1));
+			unordered2.push(unordered_type(1));
+
+			failpass("Equality of stacks of an element type with no ordering", unordered1 == unordered2);
+
+			#ifdef PLF_CPP20_SUPPORT
+				static_assert(std::is_same_v<decltype(one_two <=> one_three), std::strong_ordering>);
+				failpass("Three-way comparison test", (one_two <=> one_three) < 0 && (two_one <=> one_two) > 0 && (long1 <=> long2) == 0 && (empty1 <=> one) < 0);
+
+				static_assert(std::is_same_v<decltype(less_only1 <=> less_only2), std::weak_ordering>);
+				failpass("Three-way comparison of an element type with only <", (less_only1 <=> less_only2) == std::weak_ordering::less);
+
+				stack<double> nan_stack, double_stack;
+				nan_stack.push(std::numeric_limits<double>::quiet_NaN());
+				double_stack.push(1.0);
+
+				static_assert(std::is_same_v<decltype(nan_stack <=> double_stack), std::partial_ordering>);
+				failpass("Three-way comparison of an element type with partial ordering", (nan_stack <=> double_stack) == std::partial_ordering::unordered);
+
+				static_assert(std::three_way_comparable<stack<int>, std::strong_ordering>);
+				static_assert(!std::three_way_comparable<stack<unordered_type> >);
+				static_assert(!std::three_way_comparable<stack<non_bool_less_type> >);
+			#endif
 		}
 	}
 
