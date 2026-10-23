@@ -9,6 +9,10 @@
 
 #include "plf_stack.h"
 
+#ifdef PLF_ALLOCATOR_TRAITS_SUPPORT
+	#include <map> // stateful allocator testing
+#endif
+
 
 
 
@@ -70,6 +74,53 @@ void failpass(const char *test_type, bool condition)
 		non_copyable_non_movable(const int v) : value(v) {}
 		non_copyable_non_movable(const non_copyable_non_movable &) = delete;
 		non_copyable_non_movable & operator = (const non_copyable_non_movable &) = delete;
+	};
+#endif
+
+
+
+#if defined(PLF_ALLOCATOR_TRAITS_SUPPORT) && defined(PLF_MOVE_SEMANTICS_SUPPORT)
+	// Stateful allocator: every block must be allocated through an allocator that was not default-constructed, and freed through one equal to the allocator that allocated it
+	std::map<void *, int> allocation_owners;
+	int allocator_mismatches = 0;
+
+	template <class value_type_, bool propagate = true>
+	struct id_allocator
+	{
+		typedef value_type_ value_type;
+		typedef std::false_type is_always_equal;
+		typedef typename plf::conditional<propagate, std::true_type, std::false_type>::type propagate_on_container_copy_assignment;
+		typedef propagate_on_container_copy_assignment propagate_on_container_move_assignment;
+		typedef std::true_type propagate_on_container_swap;
+
+		template <class other_type> struct rebind { typedef id_allocator<other_type, propagate> other; };
+
+		int id;
+
+		id_allocator() PLF_NOEXCEPT: id(0) {} // Nothing may be allocated through a default-constructed allocator
+		explicit id_allocator(const int new_id) PLF_NOEXCEPT: id(new_id) {}
+		id_allocator(const id_allocator &source) PLF_NOEXCEPT: id(source.id) {}
+		template <class other_type> id_allocator(const id_allocator<other_type, propagate> &source) PLF_NOEXCEPT: id(source.id) {}
+		id_allocator & operator = (const id_allocator &source) PLF_NOEXCEPT { id = source.id; return *this; }
+
+		value_type * allocate(const std::size_t size)
+		{
+			value_type * const allocation = static_cast<value_type *>(::operator new(size * sizeof(value_type)));
+			if (id == 0) ++allocator_mismatches;
+			allocation_owners[allocation] = id;
+			return allocation;
+		}
+
+		void deallocate(value_type * const allocation, const std::size_t) PLF_NOEXCEPT
+		{
+			const std::map<void *, int>::iterator owner = allocation_owners.find(allocation);
+			if (owner == allocation_owners.end() || owner->second != id) ++allocator_mismatches;
+			if (owner != allocation_owners.end()) allocation_owners.erase(owner);
+			::operator delete(allocation);
+		}
+
+		template <class other_type> bool operator == (const id_allocator<other_type, propagate> &source) const PLF_NOEXCEPT { return id == source.id; }
+		template <class other_type> bool operator != (const id_allocator<other_type, propagate> &source) const PLF_NOEXCEPT { return id != source.id; }
 	};
 #endif
 
@@ -598,6 +649,81 @@ int main()
 
 		}
 	}
+
+
+	#if defined(PLF_ALLOCATOR_TRAITS_SUPPORT) && defined(PLF_MOVE_SEMANTICS_SUPPORT)
+	{
+		title2("Stateful allocator tests");
+
+		{
+			typedef stack<int, id_allocator<int> > id_container;
+
+			id_container container1(id_allocator<int>(1));
+
+			for (int counter = 0; counter != 1000; ++counter)
+			{
+				container1.push(counter);
+			}
+
+			for (int counter = 0; counter != 500; ++counter)
+			{
+				container1.pop();
+			}
+
+			container1.reshape(10, 50);
+			container1.shrink_to_fit();
+			container1.trim();
+
+			id_container container2(container1);
+			id_container container3(container1, id_allocator<int>(3));
+			id_container container4(std::move(container2));
+			id_container container5(std::move(container3), id_allocator<int>(5)); // unequal allocators, so elements are moved individually
+
+			id_container container6(id_allocator<int>(6));
+			container6.push(1);
+			container6 = container1; // propagates allocator 1
+			id_container container7(id_allocator<int>(7));
+			container7.push(1);
+			container7 = std::move(container4); // propagates allocator 1
+			container6.swap(container5); // swaps allocators 1 and 5
+
+			for (int counter = 0; counter != 100; ++counter)
+			{
+				container5.push(counter);
+				container6.push(counter);
+				container7.push(counter);
+			}
+
+			failpass("Stateful allocator get_allocator test", container1.get_allocator().id == 1 && container5.get_allocator().id == 1 && container6.get_allocator().id == 5 && container7.get_allocator().id == 1);
+
+			typedef stack<int, id_allocator<int, false> > id_container_no_propagation;
+
+			id_container_no_propagation container8(id_allocator<int, false>(8));
+
+			for (int counter = 0; counter != 1000; ++counter)
+			{
+				container8.push(counter);
+			}
+
+			container8.reshape(10, 50);
+			container8.shrink_to_fit();
+
+			failpass("Stateful allocator reshape test", container8.get_allocator().id == 8 && container8.size() == 1000);
+
+			id_container_no_propagation container9(id_allocator<int, false>(9));
+			container9.push(1);
+			container9 = container8; // keeps allocator 9
+			id_container_no_propagation container10(id_allocator<int, false>(10));
+			container10.push(1);
+			container10 = std::move(container8); // keeps allocator 10, so the elements are copied
+			container9.swap(container10); // swaps allocators 9 and 10
+
+			failpass("Stateful allocator no-propagation test", container9.get_allocator().id == 10 && container10.get_allocator().id == 9 && container9.size() == 1000 && container10.size() == 1000 && container8.empty());
+		}
+
+		failpass("Stateful allocator test", allocator_mismatches == 0 && allocation_owners.empty());
+	}
+	#endif
 
 	title1("Test Suite PASS - Press ENTER to Exit");
 	getchar();
