@@ -139,6 +139,20 @@ void failpass(const char *test_type, bool condition)
 
 
 
+#ifdef PLF_EXCEPTIONS_SUPPORT
+	bool throw_on_copy = false;
+
+	struct throwing_copy_type // Copy constructor throws while throw_on_copy is set
+	{
+		int value;
+
+		throwing_copy_type(const int v) : value(v) {}
+		throwing_copy_type(const throwing_copy_type &source) : value(source.value) { if (throw_on_copy) throw 1; }
+	};
+#endif
+
+
+
 #if defined(PLF_ALLOCATOR_TRAITS_SUPPORT) && defined(PLF_MOVE_SEMANTICS_SUPPORT)
 	// Stateful allocator: every block must be allocated through an allocator that was not default-constructed, and freed through one equal to the allocator that allocated it
 	std::map<void *, int> allocation_owners;
@@ -452,6 +466,57 @@ int main()
 
 			ncm_stack.emplace(1);
 			failpass("Reshape non-copyable non-movable type keeps the old block capacity limits", ncm_stack.capacity() - capacity_before > 2);
+		}
+		#endif
+
+
+		#ifdef PLF_EXCEPTIONS_SUPPORT
+		{
+			title2("Throwing push test");
+
+			stack<throwing_copy_type> throw_stack(3, 3);
+
+			for (int counter = 0; counter != 3; ++counter)
+			{
+				throw_stack.push(throwing_copy_type(counter)); // fills the first block
+			}
+
+			const throwing_copy_type element(3);
+			bool threw = false;
+			throw_on_copy = true;
+
+			try
+			{
+				throw_stack.push(element); // throws while constructing into the first slot of a new block
+			}
+			catch (int)
+			{
+				threw = true;
+			}
+
+			throw_on_copy = false;
+			failpass("Throwing push leaves stack unchanged", threw && throw_stack.size() == 3 && throw_stack.top().value == 2);
+
+			for (int counter = 3; counter != 9; ++counter)
+			{
+				throw_stack.push(throwing_copy_type(counter));
+			}
+
+			failpass("Push after throwing push uses new blocks", throw_stack.size() == 9 && throw_stack.capacity() >= 9);
+
+			bool order_correct = true;
+
+			for (int counter = 8; counter != -1; --counter)
+			{
+				if (throw_stack.top().value != counter)
+				{
+					order_correct = false;
+				}
+
+				throw_stack.pop();
+			}
+
+			failpass("Push after throwing push keeps element order", order_correct && throw_stack.empty());
 		}
 		#endif
 
