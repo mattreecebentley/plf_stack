@@ -655,7 +655,7 @@ private:
 					{
 						current_group = current_group->previous_group;
 						start_element = current_group->elements;
-						top_element = current_group->end;
+						end_element = top_element = current_group->end;
 					}
 
 					--top_element;
