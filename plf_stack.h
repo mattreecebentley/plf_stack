@@ -95,7 +95,7 @@ private:
 
 
 		#ifdef PLF_VARIADICS_SUPPORT
-			group(const allocator_type &alloc, const size_type elements_per_group, const group_pointer_type previous = NULL):
+			PLF_CONSTFUNC group(const allocator_type &alloc, const size_type elements_per_group, const group_pointer_type previous = NULL):
 				allocator_type(alloc),
 				elements(PLF_ALLOCATE(allocator_type, *this, elements_per_group, (previous == NULL) ? 0 : previous->elements)),
 				next_group(NULL),
@@ -125,7 +125,7 @@ private:
 
 
 
-		~group() PLF_NOEXCEPT
+		PLF_CONSTFUNC ~group() PLF_NOEXCEPT
 		{
 			// Null check not necessary (for empty group and copied group as above) as deallocate will do it's own null check.
 			PLF_DEALLOCATE(allocator_type, *this, elements, static_cast<size_type>(end - elements));
@@ -134,12 +134,12 @@ private:
 
 
 	group_pointer_type		current_group, first_group; // current group is location of top pointer, first_group is 'front' group, saves performance for ~stack etc
-	element_pointer_type		top_element, start_element, end_element; // start_element/end_element cache current_group->end/elements for better performance
+	element_pointer_type		top_element, start_element, end_element; // start_element/end_element cache current_group->end/elements for better performance. top_element is NULL when the stack is empty, even if memory blocks are allocated
 	size_type					total_size, total_capacity, min_block_capacity;
 	struct ebco_pair : group_allocator_type // Packaging the group allocator with the least-used member variable, for empty-base-class optimization
 	{
 		size_type max_block_capacity;
-		ebco_pair(const size_type max_elements, const allocator_type &alloc) PLF_NOEXCEPT:
+		PLF_CONSTFUNC ebco_pair(const size_type max_elements, const allocator_type &alloc) PLF_NOEXCEPT:
 			group_allocator_type(alloc),
 			max_block_capacity(max_elements)
 		{};
@@ -147,7 +147,7 @@ private:
 
 
 
-	void check_capacities_conformance(const size_type min, const size_type max) const
+	PLF_CONSTFUNC void check_capacities_conformance(const size_type min, const size_type max) const
 	{
   		if (min < 2 || min > max || max > (default_max_block_capacity()))
 		{
@@ -194,7 +194,7 @@ public:
 
 
 	// Allocator-extended constructor:
-	explicit stack(const allocator_type &alloc):
+	PLF_CONSTFUNC explicit stack(const allocator_type &alloc):
 		allocator_type(alloc),
 		current_group(NULL),
 		first_group(NULL),
@@ -210,7 +210,7 @@ public:
 
 
 	// Constructor with minimum & maximum group size parameters:
-	stack(const size_type min, const size_type max = default_max_block_capacity()):
+	PLF_CONSTFUNC stack(const size_type min, const size_type max = default_max_block_capacity()):
 		current_group(NULL),
 		first_group(NULL),
 		top_element(NULL),
@@ -227,7 +227,7 @@ public:
 
 
 	// Allocator-extended constructor with minimum & maximum group size parameters:
-	stack(const size_type min, const size_type max, const allocator_type &alloc):
+	PLF_CONSTFUNC stack(const size_type min, const size_type max, const allocator_type &alloc):
 		allocator_type(alloc),
 		current_group(NULL),
 		first_group(NULL),
@@ -246,7 +246,7 @@ public:
 
 private:
 
-	void allocate_new_group(const size_type capacity, const group_pointer_type previous_group)
+	PLF_CONSTFUNC void allocate_new_group(const size_type capacity, const group_pointer_type previous_group)
 	{
 		previous_group->next_group = PLF_ALLOCATE(group_allocator_type, group_allocator_pair, 1, previous_group);
 
@@ -277,7 +277,7 @@ private:
 
 
 
-	void deallocate_group(const group_pointer_type the_group) PLF_NOEXCEPT
+	PLF_CONSTFUNC void deallocate_group(const group_pointer_type the_group) PLF_NOEXCEPT
 	{
 		PLF_DESTROY(group_allocator_type, group_allocator_pair, the_group);
 		PLF_DEALLOCATE(group_allocator_type, group_allocator_pair, the_group, 1);
@@ -285,7 +285,7 @@ private:
 
 
 
-	void initialize()
+	PLF_CONSTFUNC void initialize()
 	{
 		first_group = current_group = PLF_ALLOCATE(group_allocator_type, group_allocator_pair, 1, 0);
 
@@ -322,7 +322,7 @@ private:
 	#ifdef PLF_TYPE_TRAITS_SUPPORT // moving from source path only occurs if type traits are supported in consolidate()
 		template <bool is_move = false>
 	#endif
-	void copy_from_source(const stack &source) // Note: this function is only called on an empty un-initialize()'d stack
+	PLF_CONSTFUNC void copy_from_source(const stack &source) // Note: this function is only called on an empty un-initialize()'d stack
 	{
 		assert(&source != this);
 
@@ -416,7 +416,7 @@ private:
 
 
 
-	void destroy_all_data() PLF_NOEXCEPT
+	PLF_CONSTFUNC void destroy_all_data() PLF_NOEXCEPT
 	{
 		#ifdef PLF_TYPE_TRAITS_SUPPORT
 			if PLF_CONSTEXPR(!std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible types eg. POD, structs, classes with empty destructor.
@@ -463,24 +463,28 @@ private:
 
 
 
-	void blank() PLF_NOEXCEPT
+	PLF_CONSTFUNC void blank() PLF_NOEXCEPT
 	{
 		#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT // allocator_traits and type_traits always available when is_always_equal is available
 			if PLF_CONSTEXPR (std::is_standard_layout<stack>::value && std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivially_destructible<group_pointer_type>::value && std::is_trivially_destructible<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
 			{
-				std::memset(static_cast<void *>(this), 0, offsetof(stack, min_block_capacity));
+				#ifdef PLF_CPP20_SUPPORT
+					if (!std::is_constant_evaluated()) // memset cannot be used during constant evaluation
+				#endif
+				{
+					std::memset(static_cast<void *>(this), 0, offsetof(stack, min_block_capacity));
+					return;
+				}
 			}
-			else
 		#endif
-		{
-			current_group = NULL;
-			first_group = NULL;
-			top_element = NULL;
-			start_element = NULL;
-			end_element = NULL;
-			total_size = 0;
-			total_capacity = 0;
-		}
+
+		current_group = NULL;
+		first_group = NULL;
+		top_element = NULL;
+		start_element = NULL;
+		end_element = NULL;
+		total_size = 0;
+		total_capacity = 0;
 	}
 
 
@@ -488,7 +492,7 @@ private:
 public:
 
 	// Copy constructor:
-	stack(const stack &source):
+	PLF_CONSTFUNC stack(const stack &source):
 		#if (defined(__cplusplus) && __cplusplus >= 201103L) || _MSC_VER >= 1700
 			allocator_type(std::allocator_traits<allocator_type>::select_on_container_copy_construction(source)),
 		#else
@@ -510,7 +514,7 @@ public:
 
 
 	// Allocator-extended copy constructor:
-	stack(const stack &source, const allocator_type &alloc):
+	PLF_CONSTFUNC stack(const stack &source, const allocator_type &alloc):
 		allocator_type(alloc),
 		current_group(NULL),
 		first_group(NULL),
@@ -529,7 +533,7 @@ public:
 
 	#ifdef PLF_MOVE_SEMANTICS_SUPPORT
 		// move constructor
-		stack(stack &&source) PLF_NOEXCEPT:
+		PLF_CONSTFUNC stack(stack &&source) PLF_NOEXCEPT:
 			allocator_type(std::move(static_cast<allocator_type &>(source))),
 			current_group(std::move(source.current_group)),
 			first_group(std::move(source.first_group)),
@@ -547,9 +551,9 @@ public:
 
 		// allocator-extended move constructor
 		#ifdef PLF_CPP20_SUPPORT
-			stack(stack &&source, const std::type_identity_t<allocator_type> &alloc):
+			PLF_CONSTFUNC stack(stack &&source, const std::type_identity_t<allocator_type> &alloc):
 		#else
-			stack(stack &&source, const allocator_type &alloc):
+			PLF_CONSTFUNC stack(stack &&source, const allocator_type &alloc):
 		#endif
 			allocator_type(alloc),
 			current_group(std::move(source.current_group)),
@@ -582,7 +586,7 @@ public:
 
 
 
-	~stack() PLF_NOEXCEPT
+	PLF_CONSTFUNC ~stack() PLF_NOEXCEPT
 	{
 		destroy_all_data();
 	}
@@ -591,7 +595,7 @@ public:
 
 private:
 
-	void progress_to_next_group() // used by push/emplace
+	PLF_CONSTFUNC void progress_to_next_group() // used by push/emplace
 	{
 		if (current_group->next_group == NULL) // no reserved groups or groups left over from previous pops, allocate new group
 		{
@@ -610,25 +614,30 @@ private:
  		#define PLF_NOTHROW_TEST_TYPE arguments...
 
  		template<typename... arguments>
- 		void push_implementation(arguments &&... parameters)
+ 		PLF_CONSTFUNC void push_implementation(arguments &&... parameters)
 
 	#elif defined(PLF_MOVE_SEMANTICS_SUPPORT) // No emplace support, type traits may be available - this is possible under older versions of MSVC, as type_traits were implemented before variadic templates
 		#define PLF_PUSH_OBJECT std::forward<el_type>(element)
 		#define PLF_NOTHROW_TEST_TYPE el_type
 
 		template<class el_type>
-		void push_implementation(el_type &&element)
+		PLF_CONSTFUNC void push_implementation(el_type &&element)
 
 	#else // Only regular insert support ie. C++03/98 compilers
 		#define PLF_PUSH_OBJECT element
 		#define PLF_NOTHROW_TEST_TYPE element_type
 
-		void push_implementation(const element_type &element)
+		PLF_CONSTFUNC void push_implementation(const element_type &element)
 	#endif
 	{
-		if (top_element == NULL)
+		if (top_element == NULL) // ie. stack is empty
 		{
-			initialize();
+			top_element = start_element; // reuse the first block, if there is one
+
+			if (top_element == NULL)
+			{
+				initialize();
+			}
 		}
 		else if (++top_element == end_element)
 		{
@@ -651,8 +660,14 @@ private:
 				}
 				catch (...)
 				{
-					if (top_element == start_element && current_group != first_group)
+					if (top_element == start_element)
 					{
+						if (current_group == first_group) // stack is empty
+						{
+							top_element = NULL;
+							throw;
+						}
+
 						current_group = current_group->previous_group;
 						start_element = current_group->elements;
 						end_element = top_element = current_group->end;
@@ -676,7 +691,7 @@ private:
 
 public:
 
-	void push(const element_type &element)
+	PLF_CONSTFUNC void push(const element_type &element)
 	{
 		push_implementation(element);
 	}
@@ -684,7 +699,7 @@ public:
 
 
 	#ifdef PLF_MOVE_SEMANTICS_SUPPORT
-		void push(element_type &&element)
+		PLF_CONSTFUNC void push(element_type &&element)
 		{
 			push_implementation(std::move(element));
 		}
@@ -693,7 +708,7 @@ public:
 
 		#ifdef PLF_VARIADICS_SUPPORT
 			template<typename... arguments>
-			void emplace(arguments &&... parameters)
+			PLF_CONSTFUNC void emplace(arguments &&... parameters)
 			{
 				push_implementation(std::forward<arguments>(parameters)...);
 			}
@@ -702,7 +717,7 @@ public:
 
 
 
-	reference top() const // Exception may occur if stack is empty in release mode
+	PLF_CONSTFUNC reference top() const // Exception may occur if stack is empty in release mode
 	{
 		assert(total_size != 0);
 		return *top_element;
@@ -710,7 +725,7 @@ public:
 
 
 
-	void pop() // Exception may occur if stack is empty
+	PLF_CONSTFUNC void pop() // Exception may occur if stack is empty
 	{
 		assert(total_size != 0);
 
@@ -721,18 +736,28 @@ public:
 			PLF_DESTROY(allocator_type, *this, top_element);
 		}
 
-		if (static_cast<int>(--total_size != 0) & static_cast<int>(top_element-- == start_element))
-		{ // ie. is start element, but not first group in stack
+		--total_size;
+
+		if (top_element != start_element)
+		{
+			--top_element;
+		}
+		else if (total_size != 0) // ie. is start element, but not first group in stack
+		{
 			current_group = current_group->previous_group;
 			start_element = current_group->elements;
 			end_element = current_group->end;
 			top_element = end_element - 1;
 		}
+		else // stack is now empty - pointing top_element before the start of the block would be undefined behaviour
+		{
+			top_element = NULL;
+		}
 	}
 
 
 
-	stack & operator = (const stack &source)
+	PLF_CONSTFUNC stack & operator = (const stack &source)
 	{
 		assert(&source != this);
 
@@ -764,10 +789,10 @@ public:
 	#ifdef PLF_MOVE_SEMANTICS_SUPPORT
 	private:
 
-		void move_assign(stack &&source) PLF_NOEXCEPT_MOVE_ASSIGN(allocator_type)
+		PLF_CONSTFUNC void move_assign(stack &&source) PLF_NOEXCEPT_MOVE_ASSIGN(allocator_type)
 		{
 			#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT
-				if PLF_CONSTEXPR ((std::is_trivially_copyable<allocator_type>::value || std::allocator_traits<allocator_type>::is_always_equal::value) &&
+				if PLF_RUNTIME_CONSTEXPR((std::is_trivially_copyable<allocator_type>::value || std::allocator_traits<allocator_type>::is_always_equal::value) &&
 					std::is_trivially_copyable<group_pointer_type>::value && std::is_trivially_copyable<element_pointer_type>::value)
 				{
 					std::memcpy(static_cast<void *>(this), &source, sizeof(stack));
@@ -801,7 +826,7 @@ public:
 	public:
 
 		// Move assignment
-		stack & operator = (stack &&source) PLF_NOEXCEPT_MOVE_ASSIGN(allocator_type)
+		PLF_CONSTFUNC stack & operator = (stack &&source) PLF_NOEXCEPT_MOVE_ASSIGN(allocator_type)
 		{
 			assert (&source != this);
 
@@ -837,21 +862,21 @@ public:
 	#ifdef PLF_CPP20_SUPPORT
 		[[nodiscard]]
 	#endif
-	bool empty() const PLF_NOEXCEPT
+	PLF_CONSTFUNC bool empty() const PLF_NOEXCEPT
 	{
 		return total_size == 0;
 	}
 
 
 
-	size_type size() const PLF_NOEXCEPT
+	PLF_CONSTFUNC size_type size() const PLF_NOEXCEPT
 	{
 		return total_size;
 	}
 
 
 
-	size_type max_size() const PLF_NOEXCEPT
+	PLF_CONSTFUNC size_type max_size() const PLF_NOEXCEPT
 	{
 		#ifdef PLF_ALLOCATOR_TRAITS_SUPPORT
 			return std::allocator_traits<allocator_type>::max_size(*this);
@@ -862,14 +887,14 @@ public:
 
 
 
-	size_type capacity() const PLF_NOEXCEPT
+	PLF_CONSTFUNC size_type capacity() const PLF_NOEXCEPT
 	{
 		return total_capacity;
 	}
 
 
 
-	size_type memory() const PLF_NOEXCEPT
+	PLF_CONSTFUNC size_type memory() const PLF_NOEXCEPT
 	{
 		size_type memory_use = sizeof(*this) + (sizeof(value_type) * total_capacity);
 
@@ -885,7 +910,7 @@ public:
 
 private:
 
-	void consolidate()
+	PLF_CONSTFUNC void consolidate()
 	{
 		#ifdef PLF_MOVE_SEMANTICS_SUPPORT
 			stack temp((min_block_capacity > total_size) ? min_block_capacity : ((total_size > group_allocator_pair.max_block_capacity) ? group_allocator_pair.max_block_capacity : total_size), group_allocator_pair.max_block_capacity, static_cast<allocator_type &>(*this)); // Make first allocated block as large as total_size, where possible
@@ -914,7 +939,7 @@ private:
 public:
 
 
-	void reshape(const size_type min, const size_type max)
+	PLF_CONSTFUNC void reshape(const size_type min, const size_type max)
 	{
 		check_capacities_conformance(min, max);
 
@@ -950,7 +975,7 @@ public:
 
 
 
-	void clear() PLF_NOEXCEPT
+	PLF_CONSTFUNC void clear() PLF_NOEXCEPT
 	{
 		destroy_all_data();
 		blank();
@@ -958,7 +983,7 @@ public:
 
 
 
-	friend bool operator == (const stack &lh, const stack &rh) PLF_NOEXCEPT
+	friend PLF_CONSTFUNC bool operator == (const stack &lh, const stack &rh) PLF_NOEXCEPT
 	{
 		if (lh.total_size != rh.total_size) return false;
 
@@ -972,35 +997,35 @@ public:
 
 
 
-	friend bool operator != (const stack &lh, const stack &rh) PLF_NOEXCEPT
+	friend PLF_CONSTFUNC bool operator != (const stack &lh, const stack &rh) PLF_NOEXCEPT
 	{
 		return !(lh == rh);
 	}
 
 
 
-	friend bool operator < (const stack &lh, const stack &rh)
+	friend PLF_CONSTFUNC bool operator < (const stack &lh, const stack &rh)
 	{
 		return std::lexicographical_compare(lh.cbegin(), lh.cend(), rh.cbegin(), rh.cend());
 	}
 
 
 
-	friend bool operator > (const stack &lh, const stack &rh)
+	friend PLF_CONSTFUNC bool operator > (const stack &lh, const stack &rh)
 	{
 		return rh < lh;
 	}
 
 
 
-	friend bool operator <= (const stack &lh, const stack &rh)
+	friend PLF_CONSTFUNC bool operator <= (const stack &lh, const stack &rh)
 	{
 		return !(rh < lh);
 	}
 
 
 
-	friend bool operator >= (const stack &lh, const stack &rh)
+	friend PLF_CONSTFUNC bool operator >= (const stack &lh, const stack &rh)
 	{
 		return !(lh < rh);
 	}
@@ -1008,7 +1033,7 @@ public:
 
 
 	#ifdef PLF_CPP20_SUPPORT
-		friend auto operator <=> (const stack &lh, const stack &rh) requires requires (const element_type &element) { { element < element } -> std::convertible_to<bool>; }
+		friend PLF_CONSTFUNC auto operator <=> (const stack &lh, const stack &rh) requires requires (const element_type &element) { { element < element } -> std::convertible_to<bool>; }
 		{
 			// Use the element's <=> where available, otherwise synthesise an ordering from <
 			return std::lexicographical_compare_three_way(lh.cbegin(), lh.cend(), rh.cbegin(), rh.cend(),
@@ -1031,7 +1056,7 @@ public:
 
 
 	// Remove trailing stack groups (not removed in general 'pop' usage for performance reasons)
-	void trim() PLF_NOEXCEPT
+	PLF_CONSTFUNC void trim() PLF_NOEXCEPT
 	{
 		if (current_group == NULL) return;// ie. stack is empty
 
@@ -1049,7 +1074,7 @@ public:
 
 
 
-	void shrink_to_fit()
+	PLF_CONSTFUNC void shrink_to_fit()
 	{
 		if (first_group == NULL || total_size == total_capacity)
 		{
@@ -1066,7 +1091,7 @@ public:
 
 
 
-	void reserve(size_type reserve_amount)
+	PLF_CONSTFUNC void reserve(size_type reserve_amount)
 	{
 		if (reserve_amount == 0 || reserve_amount <= total_capacity) return;
 
@@ -1103,7 +1128,7 @@ public:
 			}
 
 			initialize();
-			--top_element;
+			top_element = NULL; // stack is still empty
 			min_block_capacity = original_min_elements;
 		}
 
@@ -1134,14 +1159,14 @@ public:
 
 
 
-	allocator_type get_allocator() const PLF_NOEXCEPT
+	PLF_CONSTFUNC allocator_type get_allocator() const PLF_NOEXCEPT
 	{
 		return *this;
 	}
 
 
 
-	void append(stack &source)
+	PLF_CONSTFUNC void append(stack &source)
 	{
 		// Process: if there are unused memory spaces at the end of the last current back group of the chain, fill those up
 		// with elements from the source groups, starting from the back. Then link the destination stack's groups to the source stack's groups.
@@ -1195,7 +1220,7 @@ public:
 		{
 			// Use the fastest method for moving elements, while preserving values if allocator provides non-trivial pointers:
 			#if defined(PLF_TYPE_TRAITS_SUPPORT) && defined(PLF_VOIDT_SUPPORT)
-				if PLF_CONSTEXPR (!plf::allocator_has_construct<allocator_type>::value && std::is_trivially_copy_constructible<element_type>::value && std::is_trivially_destructible<element_type>::value)
+				if PLF_RUNTIME_CONSTEXPR(!plf::allocator_has_construct<allocator_type>::value && std::is_trivially_copy_constructible<element_type>::value && std::is_trivially_destructible<element_type>::value)
 				{
 					std::memcpy(plf::void_cast(top_element), plf::void_cast(source.start_element), current_source_group_size * sizeof(element_type));
 				}
@@ -1239,7 +1264,7 @@ public:
 			const element_pointer_type start = source.top_element - (elements_to_be_transferred - 1);
 
 			#if defined(PLF_TYPE_TRAITS_SUPPORT) && defined(PLF_VOIDT_SUPPORT)
-				if PLF_CONSTEXPR (!plf::allocator_has_construct<allocator_type>::value && std::is_trivially_copy_constructible<element_type>::value && std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible iterators ie. all iterators, unless allocator returns non-trivial pointers
+				if PLF_RUNTIME_CONSTEXPR(!plf::allocator_has_construct<allocator_type>::value && std::is_trivially_copy_constructible<element_type>::value && std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible iterators ie. all iterators, unless allocator returns non-trivial pointers
 				{
 					std::memcpy(plf::void_cast(top_element), plf::void_cast(start), elements_to_be_transferred * sizeof(element_type));
 				}
@@ -1283,10 +1308,10 @@ public:
 
 
 
-	void swap(stack &source) PLF_NOEXCEPT_SWAP(allocator_type)
+	PLF_CONSTFUNC void swap(stack &source) PLF_NOEXCEPT_SWAP(allocator_type)
 	{
 		#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT
-			if PLF_CONSTEXPR (std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivially_copyable<group_pointer_type>::value && std::is_trivially_copyable<element_pointer_type>::value) // if all pointer types are trivial we can just copy using memcpy - avoids constructors/destructors etc and is faster
+			if PLF_RUNTIME_CONSTEXPR(std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivially_copyable<group_pointer_type>::value && std::is_trivially_copyable<element_pointer_type>::value) // if all pointer types are trivial we can just copy using memcpy - avoids constructors/destructors etc and is faster
 			{
 				char temp[sizeof(stack)];
 				std::memcpy(static_cast<void *>(&temp), static_cast<void *>(this), sizeof(stack));
@@ -1360,88 +1385,88 @@ public:
 
 
 
-	iterator begin() PLF_NOEXCEPT
+	PLF_CONSTFUNC iterator begin() PLF_NOEXCEPT
 	{
 		return iterator(first_group, (first_group == NULL) ? NULL : first_group->elements);
 	}
 
 
 
-	const_iterator begin() const PLF_NOEXCEPT
+	PLF_CONSTFUNC const_iterator begin() const PLF_NOEXCEPT
 	{
 		return cbegin();
 	}
 
 
 
-	iterator end() PLF_NOEXCEPT
+	PLF_CONSTFUNC iterator end() PLF_NOEXCEPT
 	{
-		if (top_element == NULL) return iterator(NULL, NULL);
+		if (top_element == NULL) return iterator(first_group, start_element); // ie. empty - same as begin(), as current_group == first_group and start_element == first_group->elements (or both NULL) when the stack is empty
 		return ++iterator(current_group, top_element);
 	}
 
 
 
-	const_iterator end() const PLF_NOEXCEPT
+	PLF_CONSTFUNC const_iterator end() const PLF_NOEXCEPT
 	{
 		return cend();
 	}
 
 
 
-	const_iterator cbegin() const PLF_NOEXCEPT
+	PLF_CONSTFUNC const_iterator cbegin() const PLF_NOEXCEPT
 	{
 		return const_iterator(first_group, (first_group == NULL) ? NULL : first_group->elements);
 	}
 
 
 
-	const_iterator cend() const PLF_NOEXCEPT
+	PLF_CONSTFUNC const_iterator cend() const PLF_NOEXCEPT
 	{
-		if (top_element == NULL) return iterator(NULL, NULL);
+		if (top_element == NULL) return const_iterator(first_group, start_element); // ie. empty - same as begin(), as current_group == first_group and start_element == first_group->elements (or both NULL) when the stack is empty
 		return ++const_iterator(current_group, top_element);
 	}
 
 
 
-	reverse_iterator rbegin() PLF_NOEXCEPT
+	PLF_CONSTFUNC reverse_iterator rbegin() PLF_NOEXCEPT
 	{
 		return reverse_iterator(current_group, top_element);
 	}
 
 
 
-	const_reverse_iterator rbegin() const PLF_NOEXCEPT
+	PLF_CONSTFUNC const_reverse_iterator rbegin() const PLF_NOEXCEPT
 	{
 		return crbegin();
 	}
 
 
 
-	reverse_iterator rend() PLF_NOEXCEPT
+	PLF_CONSTFUNC reverse_iterator rend() PLF_NOEXCEPT
 	{
-		return reverse_iterator(first_group, (first_group == NULL) ? NULL : first_group->elements - 1);
+		return reverse_iterator(first_group, NULL); // NULL element pointer is the position before the first element
 	}
 
 
 
-	const_reverse_iterator rend() const PLF_NOEXCEPT
+	PLF_CONSTFUNC const_reverse_iterator rend() const PLF_NOEXCEPT
 	{
 		return crend();
 	}
 
 
 
-	const_reverse_iterator crbegin() const PLF_NOEXCEPT
+	PLF_CONSTFUNC const_reverse_iterator crbegin() const PLF_NOEXCEPT
 	{
 		return const_reverse_iterator(current_group, top_element);
 	}
 
 
 
-	const_reverse_iterator crend() const PLF_NOEXCEPT
+	PLF_CONSTFUNC const_reverse_iterator crend() const PLF_NOEXCEPT
 	{
-		return const_reverse_iterator(first_group, (first_group == NULL) ? NULL : first_group->elements - 1);
+		return const_reverse_iterator(first_group, NULL); // NULL element pointer is the position before the first element
 	}
 
 
@@ -1471,14 +1496,14 @@ public:
 		friend class stack_reverse_iterator<true>;
 
 
-		stack_iterator() PLF_NOEXCEPT:
+		PLF_CONSTFUNC stack_iterator() PLF_NOEXCEPT:
 			group_pointer(NULL),
 			element_pointer(NULL)
 		{}
 
 
 
-		stack_iterator (const stack_iterator &source) PLF_NOEXCEPT:
+		PLF_CONSTFUNC stack_iterator (const stack_iterator &source) PLF_NOEXCEPT:
 			group_pointer(source.group_pointer),
 			element_pointer(source.element_pointer)
 		{}
@@ -1487,9 +1512,9 @@ public:
 
 		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 			template <bool is_const_it = is_const, class = typename plf::enable_if<is_const_it>::type >
-			stack_iterator(const stack_iterator<false> &source) PLF_NOEXCEPT:
+			PLF_CONSTFUNC stack_iterator(const stack_iterator<false> &source) PLF_NOEXCEPT:
 		#else
-			stack_iterator(const stack_iterator<!is_const> &source) PLF_NOEXCEPT:
+			PLF_CONSTFUNC stack_iterator(const stack_iterator<!is_const> &source) PLF_NOEXCEPT:
 		#endif
 			group_pointer(source.group_pointer),
 			element_pointer(source.element_pointer)
@@ -1498,7 +1523,7 @@ public:
 
 
 		#ifdef PLF_MOVE_SEMANTICS_SUPPORT
-			stack_iterator(stack_iterator &&source) PLF_NOEXCEPT:
+			PLF_CONSTFUNC stack_iterator(stack_iterator &&source) PLF_NOEXCEPT:
 				group_pointer(std::move(source.group_pointer)),
 				element_pointer(std::move(source.element_pointer))
 			{}
@@ -1507,9 +1532,9 @@ public:
 
 			#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 				template <bool is_const_it = is_const, class = typename plf::enable_if<is_const_it>::type >
-				stack_iterator(stack_iterator<false> &&source) PLF_NOEXCEPT:
+				PLF_CONSTFUNC stack_iterator(stack_iterator<false> &&source) PLF_NOEXCEPT:
 			#else
-				stack_iterator(stack_iterator<!is_const> &&source) PLF_NOEXCEPT:
+				PLF_CONSTFUNC stack_iterator(stack_iterator<!is_const> &&source) PLF_NOEXCEPT:
 			#endif
 				group_pointer(std::move(source.group_pointer)),
 				element_pointer(std::move(source.element_pointer))
@@ -1518,7 +1543,7 @@ public:
 
 
 
-		stack_iterator & operator = (const stack_iterator &source) PLF_NOEXCEPT
+		PLF_CONSTFUNC stack_iterator & operator = (const stack_iterator &source) PLF_NOEXCEPT
 		{
 			group_pointer = source.group_pointer;
 			element_pointer = source.element_pointer;
@@ -1529,9 +1554,9 @@ public:
 
 		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 			template <bool is_const_it = is_const, class = typename plf::enable_if<is_const_it>::type >
-			stack_iterator & operator = (const stack_iterator<false> &source) PLF_NOEXCEPT
+			PLF_CONSTFUNC stack_iterator & operator = (const stack_iterator<false> &source) PLF_NOEXCEPT
 		#else
-			stack_iterator & operator = (const stack_iterator<!is_const> &source) PLF_NOEXCEPT
+			PLF_CONSTFUNC stack_iterator & operator = (const stack_iterator<!is_const> &source) PLF_NOEXCEPT
 		#endif
 		{
 			group_pointer = source.group_pointer;
@@ -1542,7 +1567,7 @@ public:
 
 
 		#ifdef PLF_MOVE_SEMANTICS_SUPPORT
-			stack_iterator & operator = (stack_iterator &&source) PLF_NOEXCEPT
+			PLF_CONSTFUNC stack_iterator & operator = (stack_iterator &&source) PLF_NOEXCEPT
 			{
 				assert(&source != this);
 				group_pointer = std::move(source.group_pointer);
@@ -1554,9 +1579,9 @@ public:
 
 			#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 				template <bool is_const_it = is_const, class = typename plf::enable_if<is_const_it>::type >
-				stack_iterator & operator = (stack_iterator<false> &&source) PLF_NOEXCEPT
+				PLF_CONSTFUNC stack_iterator & operator = (stack_iterator<false> &&source) PLF_NOEXCEPT
 			#else
-				stack_iterator & operator = (stack_iterator<!is_const> &&source) PLF_NOEXCEPT
+				PLF_CONSTFUNC stack_iterator & operator = (stack_iterator<!is_const> &&source) PLF_NOEXCEPT
 			#endif
 			{
 				group_pointer = std::move(source.group_pointer);
@@ -1567,49 +1592,77 @@ public:
 
 
 
-		bool operator == (const stack_iterator &rh) const PLF_NOEXCEPT
+		PLF_CONSTFUNC bool operator == (const stack_iterator &rh) const PLF_NOEXCEPT
 		{
+			#ifdef PLF_CPP20_SUPPORT
+				if (std::is_constant_evaluated()) // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
+				{
+					return (group_pointer == rh.group_pointer && element_pointer == rh.element_pointer);
+				}
+			#endif
+
 			return (element_pointer == rh.element_pointer);
 		}
 
 
 
-		bool operator == (const stack_iterator<!is_const> &rh) const PLF_NOEXCEPT
+		PLF_CONSTFUNC bool operator == (const stack_iterator<!is_const> &rh) const PLF_NOEXCEPT
 		{
+			#ifdef PLF_CPP20_SUPPORT
+				if (std::is_constant_evaluated()) // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
+				{
+					return (group_pointer == rh.group_pointer && element_pointer == rh.element_pointer);
+				}
+			#endif
+
 			return (element_pointer == rh.element_pointer);
 		}
 
 
 
-		bool operator != (const stack_iterator &rh) const PLF_NOEXCEPT
+		PLF_CONSTFUNC bool operator != (const stack_iterator &rh) const PLF_NOEXCEPT
 		{
+			#ifdef PLF_CPP20_SUPPORT
+				if (std::is_constant_evaluated()) // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
+				{
+					return !(group_pointer == rh.group_pointer && element_pointer == rh.element_pointer);
+				}
+			#endif
+
 			return (element_pointer != rh.element_pointer);
 		}
 
 
 
-		bool operator != (const stack_iterator<!is_const> &rh) const PLF_NOEXCEPT
+		PLF_CONSTFUNC bool operator != (const stack_iterator<!is_const> &rh) const PLF_NOEXCEPT
 		{
+			#ifdef PLF_CPP20_SUPPORT
+				if (std::is_constant_evaluated()) // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
+				{
+					return !(group_pointer == rh.group_pointer && element_pointer == rh.element_pointer);
+				}
+			#endif
+
 			return (element_pointer != rh.element_pointer);
 		}
 
 
 
-		reference operator * () const // may cause exception with uninitialized iterator
+		PLF_CONSTFUNC reference operator * () const // may cause exception with uninitialized iterator
 		{
 			return *element_pointer;
 		}
 
 
 
-		pointer operator -> () const
+		PLF_CONSTFUNC pointer operator -> () const
 		{
 			return element_pointer;
 		}
 
 
 
-		stack_iterator & operator ++ ()
+		PLF_CONSTFUNC stack_iterator & operator ++ ()
 		{
 			assert(group_pointer != NULL); // covers uninitialised stack_iterator
 
@@ -1624,7 +1677,7 @@ public:
 
 
 
-		stack_iterator operator ++(int)
+		PLF_CONSTFUNC stack_iterator operator ++(int)
 		{
 			const stack_iterator copy(*this);
 			++*this;
@@ -1633,12 +1686,18 @@ public:
 
 
 
-		stack_iterator & operator -- ()
+		PLF_CONSTFUNC stack_iterator & operator -- ()
 		{
 			assert(group_pointer != NULL);
 
-			if (element_pointer == group_pointer->elements && group_pointer->previous_group != NULL)
+			if (element_pointer == group_pointer->elements)
 			{
+				if (group_pointer->previous_group == NULL) // First element of the stack - move to the position before it (rend()), without pointing before the start of the block, which would be undefined behaviour
+				{
+					element_pointer = NULL;
+					return *this;
+				}
+
 				group_pointer = group_pointer->previous_group;
 				element_pointer = group_pointer->end;
 			}
@@ -1649,7 +1708,7 @@ public:
 
 
 
-		stack_iterator operator -- (int)
+		PLF_CONSTFUNC stack_iterator operator -- (int)
 		{
 			const stack_iterator copy(*this);
 			--*this;
@@ -1660,7 +1719,7 @@ public:
 
 	private:
 		// Used by cend(), erase() etc:
-		stack_iterator(const group_pointer_type group_p, const pointer_type element_p) PLF_NOEXCEPT:
+		PLF_CONSTFUNC stack_iterator(const group_pointer_type group_p, const pointer_type element_p) PLF_NOEXCEPT:
 			group_pointer(group_p),
 			element_pointer(element_p)
 		{}
@@ -1694,27 +1753,27 @@ public:
 		friend class stack;
 
 
-		stack_reverse_iterator () PLF_NOEXCEPT
+		PLF_CONSTFUNC stack_reverse_iterator () PLF_NOEXCEPT
 		{}
 
 
 
-		stack_reverse_iterator (const stack_reverse_iterator &source) PLF_NOEXCEPT:
+		PLF_CONSTFUNC stack_reverse_iterator (const stack_reverse_iterator &source) PLF_NOEXCEPT:
 			current(source.current)
 		{}
 
 
 		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 			template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
-			stack_reverse_iterator (const stack_reverse_iterator<false> &source) PLF_NOEXCEPT:
+			PLF_CONSTFUNC stack_reverse_iterator (const stack_reverse_iterator<false> &source) PLF_NOEXCEPT:
 		#else
-			stack_reverse_iterator (const stack_reverse_iterator<!is_const_r> &source) PLF_NOEXCEPT:
+			PLF_CONSTFUNC stack_reverse_iterator (const stack_reverse_iterator<!is_const_r> &source) PLF_NOEXCEPT:
 		#endif
 			current(source.current)
 		{}
 
 
-		stack_reverse_iterator (const stack_iterator<is_const_r> &source) PLF_NOEXCEPT:
+		PLF_CONSTFUNC stack_reverse_iterator (const stack_iterator<is_const_r> &source) PLF_NOEXCEPT:
 			current(source)
 		{
 			++(*this);
@@ -1723,9 +1782,9 @@ public:
 
 		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 			template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
-			stack_reverse_iterator (const stack_iterator<false> &source) PLF_NOEXCEPT:
+			PLF_CONSTFUNC stack_reverse_iterator (const stack_iterator<false> &source) PLF_NOEXCEPT:
 		#else
-			stack_reverse_iterator (const stack_iterator<!is_const_r> &source) PLF_NOEXCEPT:
+			PLF_CONSTFUNC stack_reverse_iterator (const stack_iterator<!is_const_r> &source) PLF_NOEXCEPT:
 		#endif
 			current(source)
 		{
@@ -1734,23 +1793,23 @@ public:
 
 
 		#ifdef PLF_MOVE_SEMANTICS_SUPPORT
-			stack_reverse_iterator (stack_reverse_iterator &&source) PLF_NOEXCEPT:
+			PLF_CONSTFUNC stack_reverse_iterator (stack_reverse_iterator &&source) PLF_NOEXCEPT:
 				current(std::move(source.current))
 			{}
 
 
 			#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 				template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
-				stack_reverse_iterator (stack_reverse_iterator<false> &&source) PLF_NOEXCEPT:
+				PLF_CONSTFUNC stack_reverse_iterator (stack_reverse_iterator<false> &&source) PLF_NOEXCEPT:
 			#else
-				stack_reverse_iterator (stack_iterator<!is_const_r> &&source) PLF_NOEXCEPT:
+				PLF_CONSTFUNC stack_reverse_iterator (stack_iterator<!is_const_r> &&source) PLF_NOEXCEPT:
 			#endif
 				current(std::move(source.current))
 			{}
 		#endif
 
 
-		stack_reverse_iterator& operator = (const stack_iterator<is_const_r> &source) PLF_NOEXCEPT
+		PLF_CONSTFUNC stack_reverse_iterator& operator = (const stack_iterator<is_const_r> &source) PLF_NOEXCEPT
 		{
 			current = source;
 			++current;
@@ -1760,9 +1819,9 @@ public:
 
 		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 			template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
-			stack_reverse_iterator& operator = (const stack_iterator<false> &source) PLF_NOEXCEPT
+			PLF_CONSTFUNC stack_reverse_iterator& operator = (const stack_iterator<false> &source) PLF_NOEXCEPT
 		#else
-			stack_reverse_iterator& operator = (const stack_iterator<!is_const_r> &source) PLF_NOEXCEPT
+			PLF_CONSTFUNC stack_reverse_iterator& operator = (const stack_iterator<!is_const_r> &source) PLF_NOEXCEPT
 		#endif
 		{
 			current = source;
@@ -1771,7 +1830,7 @@ public:
 		}
 
 
-		stack_reverse_iterator& operator = (const stack_reverse_iterator &source) PLF_NOEXCEPT
+		PLF_CONSTFUNC stack_reverse_iterator& operator = (const stack_reverse_iterator &source) PLF_NOEXCEPT
 		{
 			current = source.current;
 			return *this;
@@ -1780,9 +1839,9 @@ public:
 
 		#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 			template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
-			stack_reverse_iterator& operator = (const stack_reverse_iterator<false> &source) PLF_NOEXCEPT
+			PLF_CONSTFUNC stack_reverse_iterator& operator = (const stack_reverse_iterator<false> &source) PLF_NOEXCEPT
 		#else
-			stack_reverse_iterator& operator = (const stack_reverse_iterator<!is_const_r> &source) PLF_NOEXCEPT
+			PLF_CONSTFUNC stack_reverse_iterator& operator = (const stack_reverse_iterator<!is_const_r> &source) PLF_NOEXCEPT
 		#endif
 		{
 			current = source.current;
@@ -1791,7 +1850,7 @@ public:
 
 
 		#ifdef PLF_MOVE_SEMANTICS_SUPPORT
-			stack_reverse_iterator& operator = (stack_reverse_iterator &&source) PLF_NOEXCEPT
+			PLF_CONSTFUNC stack_reverse_iterator& operator = (stack_reverse_iterator &&source) PLF_NOEXCEPT
 			{
 				assert(&source != this);
 				current = std::move(source.current);
@@ -1801,9 +1860,9 @@ public:
 
 			#ifdef PLF_DEFAULT_TEMPLATE_ARGUMENT_SUPPORT
 				template <bool is_const_rit = is_const_r, class = typename plf::enable_if<is_const_rit>::type >
-				stack_reverse_iterator& operator = (stack_reverse_iterator<false> &&source) PLF_NOEXCEPT
+				PLF_CONSTFUNC stack_reverse_iterator& operator = (stack_reverse_iterator<false> &&source) PLF_NOEXCEPT
 			#else
-				stack_reverse_iterator& operator = (stack_reverse_iterator<!is_const_r> &&source) PLF_NOEXCEPT
+				PLF_CONSTFUNC stack_reverse_iterator& operator = (stack_reverse_iterator<!is_const_r> &&source) PLF_NOEXCEPT
 			#endif
 			{
 				assert(&source != this);
@@ -1814,49 +1873,49 @@ public:
 
 
 
-		bool operator == (const stack_reverse_iterator &rh) const PLF_NOEXCEPT
+		PLF_CONSTFUNC bool operator == (const stack_reverse_iterator &rh) const PLF_NOEXCEPT
 		{
 			return (current == rh.current);
 		}
 
 
 
-		bool operator == (const stack_reverse_iterator<!is_const_r> &rh) const PLF_NOEXCEPT
+		PLF_CONSTFUNC bool operator == (const stack_reverse_iterator<!is_const_r> &rh) const PLF_NOEXCEPT
 		{
 			return (current == rh.current);
 		}
 
 
 
-		bool operator != (const stack_reverse_iterator &rh) const PLF_NOEXCEPT
+		PLF_CONSTFUNC bool operator != (const stack_reverse_iterator &rh) const PLF_NOEXCEPT
 		{
 			return (current != rh.current);
 		}
 
 
 
-		bool operator != (const stack_reverse_iterator<!is_const_r> &rh) const PLF_NOEXCEPT
+		PLF_CONSTFUNC bool operator != (const stack_reverse_iterator<!is_const_r> &rh) const PLF_NOEXCEPT
 		{
 			return (current != rh.current);
 		}
 
 
 
-		reference operator * () const PLF_NOEXCEPT
+		PLF_CONSTFUNC reference operator * () const PLF_NOEXCEPT
 		{
 			return *current.element_pointer;
 		}
 
 
 
-		pointer operator -> () const PLF_NOEXCEPT
+		PLF_CONSTFUNC pointer operator -> () const PLF_NOEXCEPT
 		{
 			return current.element_pointer;
 		}
 
 
 
-		stack_reverse_iterator & operator ++ ()
+		PLF_CONSTFUNC stack_reverse_iterator & operator ++ ()
 		{
 			--current;
 			return *this;
@@ -1864,7 +1923,7 @@ public:
 
 
 
-		stack_reverse_iterator operator ++ (int)
+		PLF_CONSTFUNC stack_reverse_iterator operator ++ (int)
 		{
 			const stack_reverse_iterator copy(*this);
 			++*this;
@@ -1873,15 +1932,23 @@ public:
 
 
 
-		stack_reverse_iterator & operator -- ()
+		PLF_CONSTFUNC stack_reverse_iterator & operator -- ()
 		{
-			++current;
+			if (current.element_pointer == NULL) // ie. rend() - move to the first element
+			{
+				current.element_pointer = current.group_pointer->elements;
+			}
+			else
+			{
+				++current;
+			}
+
 			return *this;
 		}
 
 
 
-		stack_reverse_iterator operator -- (int)
+		PLF_CONSTFUNC stack_reverse_iterator operator -- (int)
 		{
 			const stack_reverse_iterator copy(*this);
 			--*this;
@@ -1890,16 +1957,18 @@ public:
 
 
 
-		stack_iterator<is_const_r> base() const PLF_NOEXCEPT
+		PLF_CONSTFUNC stack_iterator<is_const_r> base() const PLF_NOEXCEPT
 		{
-			return (current.group_pointer != NULL) ? ++(stack_iterator<is_const_r>(current)) : stack_iterator<is_const_r>(NULL, NULL, NULL);
+			if (current.group_pointer == NULL) return stack_iterator<is_const_r>();
+			if (current.element_pointer == NULL) return stack_iterator<is_const_r>(current.group_pointer, current.group_pointer->elements); // ie. rend().base() == begin()
+			return ++(stack_iterator<is_const_r>(current));
 		}
 
 
 
 	private:
 		// Used by rend(), etc:
-		stack_reverse_iterator(const group_pointer_type group_p, const pointer_type element_p) PLF_NOEXCEPT: current(group_p, element_p) {}
+		PLF_CONSTFUNC stack_reverse_iterator(const group_pointer_type group_p, const pointer_type element_p) PLF_NOEXCEPT: current(group_p, element_p) {}
 
 	}; // stack_reverse_iterator
 
@@ -1919,7 +1988,7 @@ namespace std
 {
 
 template <class element_type, class allocator_type>
-void swap (plf::stack<element_type, allocator_type> &a, plf::stack<element_type, allocator_type> &b) PLF_NOEXCEPT_SWAP(allocator_type)
+PLF_CONSTFUNC void swap (plf::stack<element_type, allocator_type> &a, plf::stack<element_type, allocator_type> &b) PLF_NOEXCEPT_SWAP(allocator_type)
 {
 	a.swap(b);
 }
