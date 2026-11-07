@@ -240,6 +240,15 @@
 	#endif
 
 
+	// For compile-time fast paths which must not be taken during constant evaluation (eg. memcpy/memset or std::uninitialized_copy), so that a constexpr function can use its slower fallback at compile time. At runtime this is the same as if PLF_CONSTEXPR (condition):
+	#ifdef PLF_CPP20_SUPPORT
+		#include <type_traits> // std::is_constant_evaluated
+		#define PLF_RUNTIME_CONSTEXPR(condition) (!std::is_constant_evaluated() && (condition))
+	#else
+		#define PLF_RUNTIME_CONSTEXPR(condition) PLF_CONSTEXPR (condition)
+	#endif
+
+
 	#ifdef PLF_ALLOCATOR_TRAITS_SUPPORT
 		#ifdef PLF_VARIADICS_SUPPORT
 			#define PLF_CONSTRUCT(the_allocator, allocator_instance, location, ...) std::allocator_traits<the_allocator>::construct(allocator_instance, location, __VA_ARGS__)
@@ -395,7 +404,11 @@
 		static PLF_CONSTFUNC destination_pointer_type pointer_cast(const source_pointer_type source_pointer) PLF_NOEXCEPT
 		{
 			#if defined(PLF_TYPE_TRAITS_SUPPORT) && defined(PLF_CPP20_SUPPORT) // constexpr necessary to avoid a branch for every call
-				if constexpr (std::is_trivially_constructible<destination_pointer_type>::value)
+				if constexpr (std::is_same<destination_pointer_type, source_pointer_type>::value) // No cast needed - this also allows constant evaluation, where reinterpret_cast is not allowed
+				{
+					return source_pointer;
+				}
+				else if constexpr (std::is_trivially_constructible<destination_pointer_type>::value)
 				{
 					if constexpr (std::is_trivially_constructible<source_pointer_type>::value)
 					{
@@ -667,14 +680,14 @@
 
 
 		template <class allocator_type, class iterator_type, class iterator_type2>
-		void uninitialized_copy(iterator_type begin, const iterator_type end, iterator_type2 destination,
+		PLF_CONSTFUNC void uninitialized_copy(iterator_type begin, const iterator_type end, iterator_type2 destination,
 		#ifdef PLF_CPP20_SUPPORT
 			[[maybe_unused]]
 		#endif
 			allocator_type &alloc)
 		{
 			#ifdef PLF_VOIDT_SUPPORT
-				if PLF_CONSTEXPR (!allocator_has_construct<allocator_type>::value) // If allocator has no construct method, we can take advantage of optimized routines for POD types
+				if PLF_RUNTIME_CONSTEXPR(!allocator_has_construct<allocator_type>::value) // If allocator has no construct method, we can take advantage of optimized routines for POD types
 				{
 					std::uninitialized_copy(begin, end, destination);
 				}
@@ -692,7 +705,7 @@
 
 		#ifdef PLF_MOVE_SEMANTICS_SUPPORT
 			template <class allocator_type, class iterator_type, class iterator_type2>
-			void uninitialized_move(iterator_type begin, const iterator_type end, iterator_type2 destination, allocator_type &alloc)
+			PLF_CONSTFUNC void uninitialized_move(iterator_type begin, const iterator_type end, iterator_type2 destination, allocator_type &alloc)
 			{
 				uninitialized_copy(plf::make_move_iterator(begin), plf::make_move_iterator(end), destination, alloc);
 			}
@@ -701,14 +714,14 @@
 
 
 		template <class allocator_type, class iterator_type, class element_type>
-		void uninitialized_fill_n(iterator_type begin, std::size_t size, const element_type &element,
+		PLF_CONSTFUNC void uninitialized_fill_n(iterator_type begin, std::size_t size, const element_type &element,
 		#ifdef PLF_CPP20_SUPPORT
 			[[maybe_unused]]
 		#endif
 			allocator_type &alloc)
 		{
 			#ifdef PLF_VOIDT_SUPPORT
-				if PLF_CONSTEXPR (!allocator_has_construct<allocator_type>::value)
+				if PLF_RUNTIME_CONSTEXPR(!allocator_has_construct<allocator_type>::value)
 				{
 					std::uninitialized_fill_n(begin, size, element);
 				}

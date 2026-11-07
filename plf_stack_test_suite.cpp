@@ -15,6 +15,7 @@
 #ifdef PLF_CPP20_SUPPORT
 	#include <compare> // std::strong_ordering, std::weak_ordering, std::partial_ordering, std::three_way_comparable
 	#include <type_traits> // std::is_same_v
+	#include <string> // compile-time tests
 #endif
 
 #include "plf_stack.h"
@@ -61,6 +62,177 @@ struct unordered_type // Has != (for ==) but no ordering
 		non_bool_result operator < (const non_bool_less_type &) const { return non_bool_result(); }
 		bool operator != (const non_bool_less_type &rh) const { return value != rh.value; }
 	};
+#endif
+
+
+#ifdef PLF_CPP20_SUPPORT
+	// Compile-time tests. Each function runs inside a static_assert, so the test suite fails to compile if any of these operations cannot be evaluated at compile time:
+	template <class element_type>
+	constexpr plf::stack<element_type> constexpr_make_stack(const int count)
+	{
+		plf::stack<element_type> values(3, 8); // small blocks, so that several blocks are used
+
+		for (int counter = 0; counter != count; ++counter)
+		{
+			values.push(element_type(counter));
+		}
+
+		return values;
+	}
+
+
+	constexpr bool constexpr_push_pop_test()
+	{
+		plf::stack<int> values = constexpr_make_stack<int>(100);
+		int total = 0;
+
+		while (!values.empty())
+		{
+			total += values.top();
+			values.pop();
+		}
+
+		values.emplace(5);
+		return total == 4950 && values.size() == 1 && values.top() == 5;
+	}
+
+
+	constexpr bool constexpr_copy_move_test()
+	{
+		const plf::stack<int> source = constexpr_make_stack<int>(50);
+		plf::stack<int> copy_constructed(source);
+		plf::stack<int> copy_assigned = constexpr_make_stack<int>(5);
+		copy_assigned = source;
+		plf::stack<int> move_constructed(std::move(copy_constructed));
+		plf::stack<int> move_assigned = constexpr_make_stack<int>(5);
+		move_assigned = std::move(copy_assigned);
+
+		return move_constructed == source && move_assigned == source && move_constructed.size() == 50;
+	}
+
+
+	constexpr bool constexpr_swap_append_test()
+	{
+		plf::stack<int> values1 = constexpr_make_stack<int>(30), values2 = constexpr_make_stack<int>(7);
+		values1.swap(values2);
+		const bool swap_ok = values1.size() == 7 && values2.size() == 30 && values1.top() == 6 && values2.top() == 29;
+
+		values1.append(values2);
+		int total = 0;
+
+		for (plf::stack<int>::const_iterator current = values1.begin(); current != values1.end(); ++current)
+		{
+			total += *current;
+		}
+
+		return swap_ok && values1.size() == 37 && values2.empty() && total == 21 + 435;
+	}
+
+
+	constexpr bool constexpr_capacity_test()
+	{
+		plf::stack<int> values;
+		values.reserve(100);
+		const bool reserve_ok = values.capacity() >= 100;
+
+		values = constexpr_make_stack<int>(100);
+
+		for (int counter = 0; counter != 90; ++counter)
+		{
+			values.pop();
+		}
+
+		values.trim();
+		values.shrink_to_fit();
+		values.reshape(10, 20);
+		const bool reshape_ok = values.size() == 10 && values.top() == 9;
+
+		values.clear();
+		return reserve_ok && reshape_ok && values.empty() && values.memory() >= sizeof(values);
+	}
+
+
+	constexpr bool constexpr_comparison_test()
+	{
+		const plf::stack<int> values1 = constexpr_make_stack<int>(10), values2 = constexpr_make_stack<int>(11);
+		return values1 != values2 && values1 < values2 && values1 <= values2 && values2 > values1 && values2 >= values1 && (values1 <=> values2) < 0;
+	}
+
+
+	constexpr bool constexpr_iterator_test()
+	{
+		const plf::stack<int> values = constexpr_make_stack<int>(20);
+		int forward_total = 0, reverse_total = 0, previous = -1;
+		bool order_ok = true;
+
+		for (plf::stack<int>::const_iterator current = values.begin(); current != values.end(); ++current)
+		{
+			order_ok = order_ok && *current > previous;
+			previous = *current;
+			forward_total += *current;
+		}
+
+		for (plf::stack<int>::const_reverse_iterator current = values.rbegin(); current != values.rend(); ++current)
+		{
+			reverse_total += *current;
+		}
+
+		return order_ok && forward_total == 190 && reverse_total == 190;
+	}
+
+
+	constexpr bool constexpr_empty_reuse_test()
+	{
+		plf::stack<int> values = constexpr_make_stack<int>(20);
+
+		while (!values.empty())
+		{
+			values.pop();
+		}
+
+		const bool empty_ok = values.begin() == values.end() && values.rbegin() == values.rend();
+		values.push(1);
+
+		plf::stack<int>::reverse_iterator last = values.rend();
+		--last;
+
+		return empty_ok && *last == 1 && values.rend().base() == values.begin() && last.base() == values.end();
+	}
+
+
+	constexpr bool constexpr_string_test()
+	{
+		plf::stack<std::string> values;
+
+		for (int counter = 0; counter != 40; ++counter)
+		{
+			values.push(std::string(30, static_cast<char>('a' + (counter % 26))));
+		}
+
+		plf::stack<std::string> values2(values);
+		values2.append(values);
+		std::size_t total = 0;
+
+		while (!values2.empty())
+		{
+			total += values2.top().size();
+			values2.pop();
+		}
+
+		return total == 2400 && values.empty();
+	}
+
+
+	static_assert(constexpr_push_pop_test(), "constexpr push/pop test");
+	static_assert(constexpr_copy_move_test(), "constexpr copy/move test");
+	static_assert(constexpr_swap_append_test(), "constexpr swap/append test");
+	static_assert(constexpr_capacity_test(), "constexpr capacity test");
+	static_assert(constexpr_comparison_test(), "constexpr comparison test");
+	static_assert(constexpr_iterator_test(), "constexpr iterator test");
+	static_assert(constexpr_empty_reuse_test(), "constexpr empty stack reuse test");
+	#if !(defined(__clang__) && defined(_GLIBCXX_RELEASE) && _GLIBCXX_RELEASE < 15) // clang cannot constant-evaluate std::string from libstdc++ 13 and earlier
+		static_assert(constexpr_string_test(), "constexpr string test");
+	#endif
 #endif
 
 
@@ -517,6 +689,26 @@ int main()
 			}
 
 			failpass("Push after throwing push keeps element order", order_correct && throw_stack.empty());
+
+
+			stack<throwing_copy_type> empty_throw_stack(3, 3);
+			threw = false;
+			throw_on_copy = true;
+
+			try
+			{
+				empty_throw_stack.push(element); // throws while constructing the first element of the stack
+			}
+			catch (int)
+			{
+				threw = true;
+			}
+
+			throw_on_copy = false;
+			failpass("Throwing first push leaves stack empty", threw && empty_throw_stack.empty() && empty_throw_stack.begin() == empty_throw_stack.end());
+
+			empty_throw_stack.push(element);
+			failpass("Push after throwing first push", empty_throw_stack.size() == 1 && empty_throw_stack.top().value == 3);
 		}
 		#endif
 
@@ -770,6 +962,72 @@ int main()
 				}
 
 				failpass("Equality operator test with a kept block after the top block", kept_stack == compare_stack);
+			}
+
+			{ // Stacks which are empty but still have allocated blocks, eg. after popping every element or after reserve():
+				stack<int> empty_stack(3, 3);
+
+				for (int counter = 0; counter != 7; ++counter)
+				{
+					empty_stack.push(counter);
+				}
+
+				while (!empty_stack.empty())
+				{
+					empty_stack.pop();
+				}
+
+				const stack<int> &const_empty_stack = empty_stack;
+
+				failpass("Iterators of a popped-empty stack", empty_stack.begin() == empty_stack.end() && empty_stack.rbegin() == empty_stack.rend() && const_empty_stack.begin() == const_empty_stack.end() && const_empty_stack.rbegin() == const_empty_stack.rend());
+
+				const stack<int>::size_type capacity_before = empty_stack.capacity();
+				empty_stack.push(10);
+				empty_stack.push(11);
+
+				failpass("Push after popping every element reuses the blocks", empty_stack.size() == 2 && empty_stack.top() == 11 && empty_stack.capacity() == capacity_before && *empty_stack.begin() == 10);
+
+				stack<int> reserved_stack;
+				reserved_stack.reserve(50);
+
+				failpass("Iterators of a reserved empty stack", reserved_stack.empty() && reserved_stack.begin() == reserved_stack.end() && reserved_stack.rbegin() == reserved_stack.rend());
+
+				const stack<int>::size_type reserved_capacity = reserved_stack.capacity();
+				reserved_stack.push(5);
+
+				failpass("Push after reserve uses the reserved block", reserved_stack.size() == 1 && reserved_stack.top() == 5 && reserved_stack.capacity() == reserved_capacity);
+			}
+
+
+			{ // Reverse iteration across block boundaries, down to rend():
+				stack<int> reverse_stack(3, 3);
+
+				for (int counter = 0; counter != 8; ++counter)
+				{
+					reverse_stack.push(counter);
+				}
+
+				int expected = 7;
+				bool order_correct = true;
+
+				for (stack<int>::reverse_iterator current = reverse_stack.rbegin(); current != reverse_stack.rend(); ++current)
+				{
+					order_correct = order_correct && *current == expected--;
+				}
+
+				failpass("Reverse iteration order", order_correct && expected == -1);
+
+				stack<int>::reverse_iterator last = reverse_stack.rend();
+				--last;
+
+				failpass("Decrementing rend() gives the first element", *last == 0 && last.base() == ++reverse_stack.begin());
+				failpass("rend().base() == begin()", reverse_stack.rend().base() == reverse_stack.begin() && reverse_stack.rbegin().base() == reverse_stack.end());
+
+				stack<int>::iterator first = reverse_stack.begin();
+				++first;
+				--first;
+
+				failpass("Iterator decrement back to begin()", first == reverse_stack.begin() && *first == 0);
 			}
 
 		}
