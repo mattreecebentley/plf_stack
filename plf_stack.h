@@ -1168,8 +1168,7 @@ public:
 
 	PLF_CONSTFUNC void append(stack &source)
 	{
-		// Process: if there are unused memory spaces at the end of the last current back group of the chain, fill those up
-		// with elements from the source groups, starting from the back. Then link the destination stack's groups to the source stack's groups.
+		// Process: if the top group of *this is full, link the source's groups after it. Otherwise linking them would leave a gap between the top element and the source's first element, so move or copy the source's elements onto *this instead, in order.
 
 		if (source.total_size == 0)
 		{
@@ -1209,98 +1208,103 @@ public:
 		}
 
 
-		total_size += source.total_size;
-
-
-		// Fill up the last group in *this with elements from the source:
-		size_type elements_to_be_transferred = static_cast<size_type>(end_element - ++top_element);
-		size_type current_source_group_size = static_cast<size_type>((source.top_element - source.start_element) + 1);
-
-		while (elements_to_be_transferred >= current_source_group_size)
+		#if defined(PLF_TYPE_TRAITS_SUPPORT) && defined(PLF_MOVE_SEMANTICS_SUPPORT)
+			if PLF_CONSTEXPR (!std::is_nothrow_move_constructible<element_type>::value)
+		#endif
 		{
-			// Use the fastest method for moving elements, while preserving values if allocator provides non-trivial pointers:
-			#if defined(PLF_TYPE_TRAITS_SUPPORT) && defined(PLF_VOIDT_SUPPORT)
-				if PLF_RUNTIME_CONSTEXPR(!plf::allocator_has_construct<allocator_type>::value && std::is_trivially_copy_constructible<element_type>::value && std::is_trivially_destructible<element_type>::value)
+			if (top_element + 1 != end_element) // The top group of *this is not full. Copy the source's elements across, so that both stacks are unchanged if a copy throws. Reserve first, so that copying cannot fail due to allocation:
+			{
+				reserve(total_size + source.total_size);
+				const size_type original_size = total_size;
+
+				#ifdef PLF_EXCEPTIONS_SUPPORT
+					try
+				#endif
 				{
-					std::memcpy(plf::void_cast(top_element), plf::void_cast(source.start_element), current_source_group_size * sizeof(element_type));
-				}
-				#ifdef PLF_MOVE_SEMANTICS_SUPPORT
-					else if PLF_CONSTEXPR (std::is_move_constructible<element_type>::value)
+					for (group_pointer_type current = source.first_group; ; current = current->next_group)
 					{
-						plf::uninitialized_move(source.start_element, source.top_element + 1, top_element, static_cast<allocator_type &>(*this));
+						const element_pointer_type past_end = (current == source.current_group) ? source.top_element + 1 : current->end;
+
+						for (element_pointer_type element_pointer = current->elements; element_pointer != past_end; ++element_pointer)
+						{
+							#ifdef PLF_MOVE_SEMANTICS_SUPPORT
+								push_implementation(std::move_if_noexcept(*element_pointer)); // Copies, unless the type cannot be copied
+							#else
+								push_implementation(*element_pointer);
+							#endif
+						}
+
+						if (current == source.current_group) break;
+					}
+				}
+				#ifdef PLF_EXCEPTIONS_SUPPORT
+					catch (...)
+					{
+						while (total_size != original_size)
+						{
+							pop();
+						}
+
+						throw;
 					}
 				#endif
-				else
-			#endif
-			{
-				plf::uninitialized_copy(source.start_element, source.top_element + 1, top_element, static_cast<allocator_type &>(*this));
 
-				for (element_pointer_type element_pointer = source.start_element; element_pointer != source.top_element + 1; ++element_pointer)
-				{
-					PLF_DESTROY(allocator_type, source, element_pointer);
-				}
-			}
-
-			top_element += current_source_group_size;
-
-			if (source.current_group == source.first_group)
-			{
-				--top_element;
 				source.clear();
 				return;
 			}
-
-			elements_to_be_transferred -= current_source_group_size;
-			source.current_group = source.current_group->previous_group;
-			source.start_element = source.current_group->elements;
-			source.end_element = source.current_group->end;
-			source.top_element = source.end_element - 1;
-			current_source_group_size = static_cast<size_type>(source.end_element - source.start_element);
 		}
 
-
-		if (elements_to_be_transferred != 0)
-		{
-			const element_pointer_type start = source.top_element - (elements_to_be_transferred - 1);
-
-			#if defined(PLF_TYPE_TRAITS_SUPPORT) && defined(PLF_VOIDT_SUPPORT)
-				if PLF_RUNTIME_CONSTEXPR(!plf::allocator_has_construct<allocator_type>::value && std::is_trivially_copy_constructible<element_type>::value && std::is_trivially_destructible<element_type>::value) // Avoid iteration for trivially-destructible iterators ie. all iterators, unless allocator returns non-trivial pointers
-				{
-					std::memcpy(plf::void_cast(top_element), plf::void_cast(start), elements_to_be_transferred * sizeof(element_type));
-				}
-				#ifdef PLF_MOVE_SEMANTICS_SUPPORT
-					else if PLF_CONSTEXPR (std::is_move_constructible<element_type>::value)
-					{
-						plf::uninitialized_move(start, source.top_element + 1, top_element, static_cast<allocator_type &>(*this));
-					}
-				#endif
-				else
-			#endif
-			{
-				plf::uninitialized_copy(start, source.top_element + 1, top_element, static_cast<allocator_type &>(*this));
-
-				// The following loop is necessary because the allocator may return non-trivially-destructible pointer types, making iterator a non-trivially-destructible type:
-				for (element_pointer_type element_pointer = start; element_pointer != source.top_element + 1; ++element_pointer)
-				{
-					PLF_DESTROY(allocator_type, source, element_pointer);
-				}
-			}
-
-			source.top_element = start - 1;
-		}
 
 		// Trim trailing groups on both, link source and destinations groups and remove references to source groups from source:
 		source.trim();
 		trim();
 
+		element_pointer_type write = top_element + 1; // The first free location in the top group of *this
 
 		current_group->next_group = source.first_group;
 		source.first_group->previous_group = current_group;
 
-		current_group = source.current_group;
-		top_element = source.top_element;
-		start_element = source.start_element;
-		end_element = source.end_element;
+		if (write == end_element) // The top group of *this is full, so the source's groups follow on directly
+		{
+			current_group = source.current_group;
+			top_element = source.top_element;
+			start_element = source.start_element;
+			end_element = source.end_element;
+		}
+		else // Move each of the source's elements down into the gap left by the free locations in the top group of *this, in order. Element types reaching this point are nothrow-move-constructible
+		{
+			#if defined(PLF_TYPE_TRAITS_SUPPORT) && defined(PLF_MOVE_SEMANTICS_SUPPORT)
+				group_pointer_type write_group = current_group;
+
+				for (group_pointer_type read_group = source.first_group; ; read_group = read_group->next_group)
+				{
+					const element_pointer_type past_end = (read_group == source.current_group) ? source.top_element + 1 : read_group->end;
+
+					for (element_pointer_type read = read_group->elements; read != past_end; ++read)
+					{
+						if (write == write_group->end)
+						{
+							write_group = write_group->next_group;
+							write = write_group->elements;
+						}
+
+						PLF_CONSTRUCT_ELEMENT(write, std::move(*read));
+						++write;
+						PLF_DESTROY(allocator_type, source, read);
+					}
+
+					if (read_group == source.current_group) break;
+				}
+
+				// Any groups after write_group are now unused, and stay allocated, as they would after pops:
+				current_group = write_group;
+				top_element = write - 1;
+				start_element = current_group->elements;
+				end_element = current_group->end;
+			#endif
+		}
+
+		total_size += source.total_size;
 		total_capacity += source.total_capacity;
 
 		source.blank();

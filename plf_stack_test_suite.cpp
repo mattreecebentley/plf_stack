@@ -2,6 +2,7 @@
 
 #include <cstdio> // log redirection
 #include <cstdlib> // abort
+#include <string>
 
 #ifdef PLF_MOVE_SEMANTICS_SUPPORT
 	#include <utility> // std::move
@@ -245,6 +246,40 @@ void push_values(container_type &container, const value_type *values, const unsi
 	}
 }
 
+
+
+
+#ifdef PLF_EXCEPTIONS_SUPPORT
+	// Copy construction throws once copies_until_throw reaches 0. There is no noexcept move constructor, so stack::append copies it:
+	int copies_until_throw = -1;
+
+	struct throwing_copy
+	{
+		int value;
+
+		throwing_copy(const int number): value(number) {}
+
+		throwing_copy(const throwing_copy &source): value(source.value)
+		{
+			if (copies_until_throw >= 0 && copies_until_throw-- == 0) throw 1;
+		}
+	};
+#endif
+
+
+
+// Pops elements and checks that they come out as last, last - 1, ... first:
+template <class stack_type>
+bool pops_in_order(stack_type &the_stack, const int last, const int first)
+{
+	for (int expected = last; expected != first - 1; --expected)
+	{
+		if (the_stack.empty() || the_stack.top() != expected) return false;
+		the_stack.pop();
+	}
+
+	return true;
+}
 
 
 
@@ -821,6 +856,79 @@ int main()
 			}
 
 
+			{
+				stack<int> stack1(3, 8), stack2(3, 3);
+
+				for (int number = 1; number != 5; ++number)
+				{
+					stack1.push(number); // blocks of 3 and 6: the top block is not full
+				}
+
+				for (int number = 10; number != 16; ++number)
+				{
+					stack2.push(number);
+				}
+
+				stack1.append(stack2);
+
+				failpass("Append onto a partly-filled block order test", pops_in_order(stack1, 15, 10) && pops_in_order(stack1, 4, 1) && stack1.empty());
+			}
+
+
+			#ifdef PLF_MOVE_SEMANTICS_SUPPORT
+			{
+				stack<std::string> stack1(3, 8), stack2(3, 3); // std::string is nothrow-movable, so the source's elements are moved down into the free locations
+
+				for (int number = 1; number != 5; ++number)
+				{
+					stack1.push(std::string(30, char('a' + number)));
+				}
+
+				for (int number = 10; number != 16; ++number)
+				{
+					stack2.push(std::string(30, char('a' + number)));
+				}
+
+				stack1.append(stack2);
+
+				bool correct = stack1.size() == 10 && stack2.empty() && stack1.capacity() >= stack1.size();
+
+				for (int number = 15; correct && number != 9; --number)
+				{
+					correct = stack1.top() == std::string(30, char('a' + number));
+					stack1.pop();
+				}
+
+				for (int number = 4; correct && number != 0; --number)
+				{
+					correct = stack1.top() == std::string(30, char('a' + number));
+					stack1.pop();
+				}
+
+				failpass("Append onto a partly-filled block with a non-trivial type test", correct && stack1.empty());
+			}
+			#endif
+
+
+			{
+				stack<int> stack1(3, 3), stack2(3, 3);
+
+				for (int number = 1; number != 4; ++number)
+				{
+					stack1.push(number); // the top block is full, so the source's blocks are linked
+				}
+
+				for (int number = 10; number != 16; ++number)
+				{
+					stack2.push(number);
+				}
+
+				stack1.append(stack2);
+
+				failpass("Append onto a full block order test", pops_in_order(stack1, 15, 10) && pops_in_order(stack1, 3, 1) && stack1.empty());
+			}
+
+
 			#ifdef PLF_EXCEPTIONS_SUPPORT
 			{ // The block capacity limits are checked before either stack is changed
 				stack<int> stack1(3, 3), stack2(10, 10);
@@ -880,6 +988,51 @@ int main()
 				}
 
 				failpass("Append to an empty stack with incompatible block capacities throws length_error test", threw_length_error && stack1.empty() && stack2.size() == 5 && stack2.top() == 14);
+			}
+
+
+			{
+				stack<throwing_copy> stack1(3, 8), stack2(3, 3);
+
+				for (int number = 1; number != 5; ++number)
+				{
+					stack1.push(throwing_copy(number)); // the top block is not full, so the elements are copied
+				}
+
+				for (int number = 10; number != 16; ++number)
+				{
+					stack2.push(throwing_copy(number));
+				}
+
+				bool threw = false;
+				copies_until_throw = 3;
+
+				try
+				{
+					stack1.append(stack2);
+				}
+				catch (int)
+				{
+					threw = true;
+				}
+
+				copies_until_throw = -1;
+
+				bool unchanged = stack1.size() == 4 && stack2.size() == 6;
+
+				for (int number = 4; unchanged && number != 0; --number)
+				{
+					unchanged = stack1.top().value == number;
+					stack1.pop();
+				}
+
+				for (int number = 15; unchanged && number != 9; --number)
+				{
+					unchanged = stack2.top().value == number;
+					stack2.pop();
+				}
+
+				failpass("Append with a throwing copy leaves both stacks unchanged", threw && unchanged);
 			}
 			#endif
 		}
