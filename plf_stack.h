@@ -469,7 +469,7 @@ private:
 			if PLF_CONSTEXPR (std::is_standard_layout<stack>::value && std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivially_destructible<group_pointer_type>::value && std::is_trivially_destructible<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
 			{
 				#ifdef PLF_CPP20_SUPPORT
-					if (!std::is_constant_evaluated()) // memset cannot be used during constant evaluation
+					if PLF_NOT_CONSTEVAL // memset cannot be used during constant evaluation
 				#endif
 				{
 					std::memset(static_cast<void *>(this), 0, offsetof(stack, min_block_capacity));
@@ -792,7 +792,7 @@ public:
 		PLF_CONSTFUNC void move_assign(stack &&source) PLF_NOEXCEPT_MOVE_ASSIGN(allocator_type)
 		{
 			#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT
-				if PLF_RUNTIME_CONSTEXPR((std::is_trivially_copyable<allocator_type>::value || std::allocator_traits<allocator_type>::is_always_equal::value) &&
+				if PLF_CONSTEXPR_NOT_CONSTEVAL((std::is_trivially_copyable<allocator_type>::value || std::allocator_traits<allocator_type>::is_always_equal::value) &&
 					std::is_trivially_copyable<group_pointer_type>::value && std::is_trivially_copyable<element_pointer_type>::value)
 				{
 					std::memcpy(static_cast<void *>(this), &source, sizeof(stack));
@@ -1315,7 +1315,7 @@ public:
 	PLF_CONSTFUNC void swap(stack &source) PLF_NOEXCEPT_SWAP(allocator_type)
 	{
 		#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT
-			if PLF_RUNTIME_CONSTEXPR(std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivially_copyable<group_pointer_type>::value && std::is_trivially_copyable<element_pointer_type>::value) // if all pointer types are trivial we can just copy using memcpy - avoids constructors/destructors etc and is faster
+			if PLF_CONSTEXPR_NOT_CONSTEVAL(std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivially_copyable<group_pointer_type>::value && std::is_trivially_copyable<element_pointer_type>::value) // if all pointer types are trivial we can just copy using memcpy - avoids constructors/destructors etc and is faster
 			{
 				char temp[sizeof(stack)];
 				std::memcpy(static_cast<void *>(&temp), static_cast<void *>(this), sizeof(stack));
@@ -1599,7 +1599,7 @@ public:
 		PLF_CONSTFUNC bool operator == (const stack_iterator &rh) const PLF_NOEXCEPT
 		{
 			#ifdef PLF_CPP20_SUPPORT
-				if (std::is_constant_evaluated()) // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
+				if PLF_CONSTEVAL // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
 				{
 					return (group_pointer == rh.group_pointer && element_pointer == rh.element_pointer);
 				}
@@ -1613,7 +1613,7 @@ public:
 		PLF_CONSTFUNC bool operator == (const stack_iterator<!is_const> &rh) const PLF_NOEXCEPT
 		{
 			#ifdef PLF_CPP20_SUPPORT
-				if (std::is_constant_evaluated()) // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
+				if PLF_CONSTEVAL // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
 				{
 					return (group_pointer == rh.group_pointer && element_pointer == rh.element_pointer);
 				}
@@ -1627,7 +1627,7 @@ public:
 		PLF_CONSTFUNC bool operator != (const stack_iterator &rh) const PLF_NOEXCEPT
 		{
 			#ifdef PLF_CPP20_SUPPORT
-				if (std::is_constant_evaluated()) // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
+				if PLF_CONSTEVAL // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
 				{
 					return !(group_pointer == rh.group_pointer && element_pointer == rh.element_pointer);
 				}
@@ -1641,7 +1641,7 @@ public:
 		PLF_CONSTFUNC bool operator != (const stack_iterator<!is_const> &rh) const PLF_NOEXCEPT
 		{
 			#ifdef PLF_CPP20_SUPPORT
-				if (std::is_constant_evaluated()) // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
+				if PLF_CONSTEVAL // end() may point one-past-the-end of a different block, and comparing such pointers is not allowed during constant evaluation. Equal positions always have the same group
 				{
 					return !(group_pointer == rh.group_pointer && element_pointer == rh.element_pointer);
 				}
