@@ -466,15 +466,10 @@ private:
 	PLF_CONSTFUNC void blank() PLF_NOEXCEPT
 	{
 		#ifdef PLF_IS_ALWAYS_EQUAL_SUPPORT // allocator_traits and type_traits always available when is_always_equal is available
-			if PLF_CONSTEXPR (std::is_standard_layout<stack>::value && std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivially_destructible<group_pointer_type>::value && std::is_trivially_destructible<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
+			if PLF_CONSTEXPR_NOT_CONSTEVAL (std::is_standard_layout<stack>::value && std::allocator_traits<allocator_type>::is_always_equal::value && std::is_trivially_destructible<group_pointer_type>::value && std::is_trivially_destructible<element_pointer_type>::value) // if all pointer types are trivial, we can just nuke it from orbit with memset (NULL is always 0 in C++):
 			{
-				#ifdef PLF_CPP20_SUPPORT
-					if PLF_NOT_CONSTEVAL // memset cannot be used during constant evaluation
-				#endif
-				{
-					std::memset(static_cast<void *>(this), 0, offsetof(stack, min_block_capacity));
-					return;
-				}
+				std::memset(static_cast<void *>(this), 0, offsetof(stack, min_block_capacity));
+				return;
 			}
 		#endif
 
@@ -1161,7 +1156,7 @@ public:
 
 	PLF_CONSTFUNC allocator_type get_allocator() const PLF_NOEXCEPT
 	{
-		return *this;
+		return static_cast<allocator_type>(*this);
 	}
 
 
